@@ -127,7 +127,15 @@ public class SeleccionFuncionVista extends BorderPane {
                 }
 
                 String peliStr = extractJsonObject(json, "pelicula");
-                Pelicula pelicula = new Pelicula(extractField(peliStr, "titulo"), Integer.parseInt(extractField(peliStr, "duracion")), extractField(peliStr, "clasificacion"));
+                Pelicula pelicula = new Pelicula(
+                    extractField(peliStr, "id"), 
+                    extractField(peliStr, "titulo"), 
+                    Integer.parseInt(extractField(peliStr, "duracion")), 
+                    extractField(peliStr, "clasificacion"), 
+                    null, null, null, null, 
+                    java.time.LocalDate.now(), 
+                    com.cine.dominio.EstadoPelicula.VENTA
+                );
                 
                 LocalDateTime horaInicio = LocalDateTime.parse(extractField(json, "horaInicio"));
                 FormatoFuncion formato = FormatoFuncion.valueOf(extractField(json, "formato"));
