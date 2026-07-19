@@ -27,6 +27,8 @@ public class EstadoServidor {
     private Pelicula pelicula;
     private Funcion funcion;
     private final MotorPrecios pricingEngine;
+    private final java.util.Map<String, SalaCine> salasEnMemoria = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, Funcion> funcionesEnMemoria = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final CineRepository cineRepo = new CineRepository();
     private final PeliculaRepository peliculaRepo = new PeliculaRepository();
@@ -51,21 +53,49 @@ public class EstadoServidor {
         List<Cine> cines = cineRepo.findAll();
         if (cines.isEmpty()) {
             crearDatosDePrueba();
-        } else {
-            this.cinema = cines.get(0);
-            this.sala = salaRepo.findAll().get(0);
-            this.pelicula = peliculaRepo.findAll().get(0);
-            this.funcion = funcionRepo.findAll().get(0);
+            cines = cineRepo.findAll();
+        }
 
-            // Cargar asientos reservados
-            List<String> bookedSeats = reservaRepo.getBookedSeatIds(this.funcion.getId());
+        for (SalaCine s : salaRepo.findAll()) {
+            salasEnMemoria.put(s.getId(), s);
+        }
+
+        for (Funcion f : funcionRepo.findAll()) {
+            funcionesEnMemoria.put(f.getId(), f);
+            List<String> bookedSeats = reservaRepo.getBookedSeatIds(f.getId());
             for (String seatId : bookedSeats) {
-                Butaca s = findSeatById(seatId);
+                Butaca s = f.getSala().getTodasLasButacas().stream()
+                        .filter(seat -> seat.getId().equals(seatId))
+                        .findFirst()
+                        .orElse(null);
                 if (s != null) {
-                    s.seleccionar();
-                    s.reservarButaca();
+                    try { s.seleccionar(); } catch(Exception ignored) {}
+                    try { s.reservarButaca(); } catch(Exception ignored) {}
                 }
             }
+        }
+
+        // Barrido de seguridad: SELECTED es un estado volátil de sesión que nunca
+        // debe sobrevivir a un reinicio del servidor. Si el servidor crasheó mientras
+        // un cliente tenía butacas bloqueadas, éstas quedarían en SELECTED en memoria
+        // sin que ningún cliente tenga el lock, bloqueándolas indefinidamente.
+        // Este barrido garantiza que al arrancar, todas las butacas están en FREE o BOOKED.
+        for (SalaCine sala : salasEnMemoria.values()) {
+            for (Butaca b : sala.getTodasLasButacas()) {
+                if (b.getEstado() == EstadoButaca.SELECTED) {
+                    try {
+                        b.liberar();
+                        System.out.printf("[EstadoServidor] Butaca %s liberada (estaba en SELECTED al arrancar)%n", b.getId());
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        if (!cines.isEmpty()) this.cinema = cines.get(0);
+        if (!salasEnMemoria.isEmpty()) this.sala = salasEnMemoria.values().iterator().next();
+        if (!funcionesEnMemoria.isEmpty()) {
+            this.funcion = funcionesEnMemoria.values().iterator().next();
+            this.pelicula = this.funcion.getPelicula();
         }
     }
 
@@ -96,10 +126,6 @@ public class EstadoServidor {
         funcionRepo.save(funcion);
     }
 
-    private void preBook(int row, int col) {
-        Butaca s = sala.getButaca(row, col);
-        if (s != null) { s.seleccionar(); s.reservarButaca(); }
-    }
 
     // ─────────────────────────────────────────────────────────────────────
     // Operaciones atómicas sobre butacas
@@ -114,7 +140,10 @@ public class EstadoServidor {
      * @return lista de tickets generados
      * @throws IllegalStateException si alguna butaca no está en estado SELECTED
      */
-    public synchronized List<Boleto> confirmPurchase(List<String> seatIds, String dniInput) {
+    public synchronized List<Boleto> confirmPurchase(List<String> seatIds, String dniInput, String funcionId) {
+        Funcion f = funcionId != null ? funcionesEnMemoria.get(funcionId) : this.funcion;
+        if (f == null) throw new IllegalStateException("Función no encontrada");
+
         // Fase 1: validar que todas están en SELECTED
         List<Butaca> seatsToBook = new ArrayList<>();
         for (String id : seatIds) {
@@ -126,7 +155,7 @@ public class EstadoServidor {
             seatsToBook.add(s);
         }
 
-        // Fase 2: reservar todas (rollback si falla alguna)
+        // Fase 2: reservar todas (rollback completo si falla alguna)
         List<Butaca> booked = new ArrayList<>();
         try {
             for (Butaca butaca : seatsToBook) {
@@ -134,9 +163,13 @@ public class EstadoServidor {
                 booked.add(butaca);
             }
         } catch (Exception ex) {
-            // Rollback: liberar las que se alcanzaron a reservar
-            for (Butaca s : booked) {
-                try { s.liberar(); } catch (Exception ignored) {}
+            // Rollback total: liberar TODAS las butacas del grupo,
+            // tanto las ya BOOKED como las que aún quedaron en SELECTED.
+            for (Butaca s : seatsToBook) {
+                EstadoButaca est = s.getEstado();
+                if (est == EstadoButaca.BOOKED || est == EstadoButaca.SELECTED) {
+                    try { s.liberar(); } catch (Exception ignored) {}
+                }
             }
             throw ex;
         }
@@ -147,14 +180,14 @@ public class EstadoServidor {
 
         List<Boleto> result = new ArrayList<>();
         for (Butaca butaca : seatsToBook) {
-            double base = funcion.getPrecioBase()
-                    * funcion.getFormat().getMultiplicadorPrecio()
+            double base = f.getPrecioBase()
+                    * f.getFormat().getMultiplicadorPrecio()
                     * butaca.getTipo().priceMultiplier();
-            double final_ = pricingEngine.calcularPrecio(butaca, funcion);
+            double final_ = pricingEngine.calcularPrecio(butaca, f);
 
             Boleto t = new Boleto.Builder()
                     .butaca(butaca)
-                    .funcion(funcion)
+                    .funcion(f)
                     .originalPrice(base)
                     .pricePaid(final_)
                     .appliedDiscountNames(discountNames)
@@ -164,29 +197,74 @@ public class EstadoServidor {
         }
         
         // Guardar en la base de datos
-        reservaRepo.saveReservas(this.funcion, result);
+        reservaRepo.saveReservas(f, result);
         
         tickets.addAll(result);
         return result;
     }
 
     /**
-     * Busca una butaca por su ID textual (ej. "B3").
+     * Busca una butaca por su ID textual (ej. "B3") en todas las salas en memoria.
      */
     public Butaca findSeatById(String seatId) {
-        return sala.getTodasLasButacas().stream()
-                .filter(s -> s.getId().equals(seatId))
-                .findFirst()
-                .orElse(null);
+        for (SalaCine s : salasEnMemoria.values()) {
+            Butaca b = s.getTodasLasButacas().stream()
+                    .filter(seat -> seat.getId().equals(seatId))
+                    .findFirst()
+                    .orElse(null);
+            if (b != null) return b;
+        }
+        return null;
+    }
+
+    /**
+     * Devuelve el historial de compras como JSON para el panel de administración.
+     * Cada objeto contiene: ref, dni, fecha, pelicula, sala, cine, horario, butacas (legibles).
+     */
+    public synchronized String getReservasJson() {
+        java.util.List<String[]> rows = reservaRepo.findAllWithDetails();
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < rows.size(); i++) {
+            String[] r = rows.get(i);
+            // r: [0]=ref [1]=dni [2]=fecha [3]=pelicula [4]=sala [5]=cine [6]=horario [7]=butacaIds
+            // Convertir IDs de butacas a etiquetas legibles (Fila+Número)
+            String butacasLegibles = "";
+            if (r[7] != null && !r[7].isBlank()) {
+                String[] ids = r[7].split("\\|");
+                java.util.StringJoiner sj = new java.util.StringJoiner(", ");
+                for (String id : ids) {
+                    Butaca b = findSeatById(id.trim());
+                    sj.add(b != null ? b.getFila() + b.getNumero() : id.substring(0, 8) + "…");
+                }
+                butacasLegibles = sj.toString();
+            }
+            sb.append("{")
+              .append("\"ref\":\"").append(r[0]).append("\",")
+              .append("\"dni\":\"").append(r[1] != null ? r[1] : "").append("\",")
+              .append("\"fecha\":\"").append(r[2] != null ? r[2].substring(0, Math.min(16, r[2].length())) : "").append("\",")
+              .append("\"pelicula\":\"").append(r[3]).append("\",")
+              .append("\"sala\":\"").append(r[4]).append("\",")
+              .append("\"cine\":\"").append(r[5]).append("\",")
+              .append("\"horario\":\"").append(r[6] != null ? r[6].substring(0, Math.min(16, r[6].length())) : "").append("\",")
+              .append("\"butacas\":\"").append(butacasLegibles).append("\"")
+              .append("}");
+            if (i < rows.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     /**
      * Serializa el estado actual de toda la sala como JSON simple.
      * Formato: [{"id":"A1","tipo":"NORMAL","estado":"FREE"}, ...]
      */
-    public synchronized String getRoomStateJson() {
+    public synchronized String getRoomStateJson(String funcionId) {
+        Funcion f = funcionId != null ? funcionesEnMemoria.get(funcionId) : this.funcion;
+        if (f == null) return "[]";
+        SalaCine sToUse = f.getSala();
+        
         StringBuilder sb = new StringBuilder("[");
-        List<Butaca> all = sala.getTodasLasButacas();
+        List<Butaca> all = sToUse.getTodasLasButacas();
         for (int i = 0; i < all.size(); i++) {
             Butaca s = all.get(i);
             sb.append("{")
@@ -243,13 +321,20 @@ public class EstadoServidor {
             for (int j = 0; j < columnas; j++) {
                 if (idx < matrizCSV.length) {
                     TipoButaca tipo = TipoButaca.fromCode(matrizCSV[idx]);
-                    editor.setSeatType(i, j, tipo);
+                    // Bug 5: PASILLO significa celda vacía (null), no una Butaca con tipo PASILLO.
+                    // Usar clearCell() para que el modelo de dominio sea consistente.
+                    if (tipo == TipoButaca.PASILLO) {
+                        editor.clearCell(i, j);
+                    } else {
+                        editor.setSeatType(i, j, tipo);
+                    }
                     idx++;
                 }
             }
         }
 
         salaRepo.save(nuevaSala);
+        salasEnMemoria.put(nuevaSala.getId(), nuevaSala);
     }
 
     public synchronized String getPeliculasJson() {
@@ -297,8 +382,12 @@ public class EstadoServidor {
         if (sala == null || pelicula == null) {
             throw new IllegalArgumentException("Sala o Película no encontrada");
         }
+        SalaCine memSala = salasEnMemoria.get(salaId);
+        if (memSala != null) sala = memSala;
+        
         Funcion f = new Funcion(sala, pelicula, horaInicio, formato, precioBase);
         funcionRepo.save(f);
+        funcionesEnMemoria.put(f.getId(), f);
     }
 
     // Getters para el ManejadorCliente
@@ -334,7 +423,7 @@ public class EstadoServidor {
         if (f == null) return "{}";
         
         StringBuilder sb = new StringBuilder("{");
-        sb.append("\"id\":\"").append(f.getId()).append("\",")
+        sb.append("\"funcionId\":\"").append(f.getId()).append("\",")
           .append("\"horaInicio\":\"").append(f.getStartTime().toString()).append("\",")
           .append("\"formato\":\"").append(f.getFormat().name()).append("\",")
           .append("\"precioBase\":").append(f.getPrecioBase()).append(",");
@@ -365,13 +454,14 @@ public class EstadoServidor {
           .append("\"ciudad\":\"").append(c.getCity()).append("\"")
           .append("},");
 
-        // Butacas
+        // Butacas — incluye TODAS las celdas (incluyendo PASILLO/null) para
+        // que el cliente pueda reconstruir la geometría exacta de la sala.
         sb.append("\"butacas\":[");
-        int count = 0;
-        int max = s.getTotalRows() * s.getTotalColumns();
+        boolean first = true;
         for (int r = 0; r < s.getTotalRows(); r++) {
             for (int col = 0; col < s.getTotalColumns(); col++) {
                 Butaca b = s.getButaca(r, col);
+                if (!first) sb.append(",");
                 if (b != null) {
                     sb.append("{")
                       .append("\"id\":\"").append(b.getId()).append("\",")
@@ -379,13 +469,17 @@ public class EstadoServidor {
                       .append("\"c\":").append(col).append(",")
                       .append("\"t\":\"").append(b.getTipo().code()).append("\"")
                       .append("}");
-                    if (count < max - 1) sb.append(",");
+                } else {
+                    // Celda vacía: se envía como PASILLO para que el cliente la limpie
+                    sb.append("{")
+                      .append("\"id\":\"").append("\",")
+                      .append("\"f\":").append(r).append(",")
+                      .append("\"c\":").append(col).append(",")
+                      .append("\"t\":\"PASILLO\"")
+                      .append("}");
                 }
-                count++;
+                first = false;
             }
-        }
-        if (sb.charAt(sb.length() - 1) == ',') {
-            sb.deleteCharAt(sb.length() - 1);
         }
         sb.append("]"); // end butacas
         sb.append("}"); // end sala

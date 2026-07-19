@@ -65,7 +65,7 @@ public class Boleto {
 
     private Boleto(Builder constructor) {
         this.id = UUID.randomUUID().toString();
-        this.referenceCode = generateReferenceCode();
+        this.referenceCode = constructor.referenceCode != null ? constructor.referenceCode : generateReferenceCode();
         this.buyerIdNumber = constructor.buyerIdNumber != null && !constructor.buyerIdNumber.trim().isEmpty()
                 ? constructor.buyerIdNumber.trim()
                 : ANONYMOUS_ID;
@@ -98,6 +98,12 @@ public class Boleto {
         private double pricePaid;
         private List<String> appliedDiscountNames = Collections.emptyList();
         private String buyerIdNumber;
+        private String referenceCode;
+
+        public Builder referenceCode(String referenceCode) {
+            this.referenceCode = referenceCode;
+            return this;
+        }
 
         public Builder butaca(Butaca butaca) {
             this.butaca = butaca;

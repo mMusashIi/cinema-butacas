@@ -8,13 +8,18 @@ import com.cine.cliente.ui.componentes.organismos.PanelSeleccion;
 import com.cine.dominio.*;
 import com.cine.dominio.precios.MotorPrecios;
 import com.cine.compartido.Protocolo;
+import com.cine.dominio.boletos.Boleto;
+import com.cine.dominio.boletos.GeneradorPdfBoleto;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.layout.BorderPane;
+import javafx.stage.FileChooser;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PuntoVentaVista extends BorderPane {
 
@@ -27,6 +32,12 @@ public class PuntoVentaVista extends BorderPane {
     private ClienteRed clienteRed;
     private final Set<String> mySelectedSeatIds = new LinkedHashSet<>();
     private final List<Butaca> mySelectedSeats = new ArrayList<>();
+
+    /**
+     * Bug 5: Garantiza que el fin de sesión (por timeout del servidor o por el
+     * botón "← Volver") se procese exactamente una vez, evitando doble-navegación.
+     */
+    private final AtomicBoolean sessionHandled = new AtomicBoolean(false);
 
     private PanelCabecera panelCabecera;
     private PanelCuadriculaButacas panelCuadriculaButacas;
@@ -47,6 +58,9 @@ public class PuntoVentaVista extends BorderPane {
         javafx.scene.control.Button btnVolver = new javafx.scene.control.Button("← Volver");
         btnVolver.setStyle("-fx-cursor: hand; -fx-background-color: #333; -fx-text-fill: white; -fx-padding: 5 15;");
         btnVolver.setOnAction(e -> {
+            // Bug 5: marcar la sesión como manejada para que onSessionExpired
+            // ignore cualquier mensaje tardío que llegue del servidor.
+            if (!sessionHandled.compareAndSet(false, true)) return;
             if (clienteRed != null) clienteRed.disconnect();
             com.cine.cliente.ui.GestorVistas.navegarA(new SeleccionFuncionVista());
         });
@@ -88,7 +102,7 @@ public class PuntoVentaVista extends BorderPane {
     }
 
     private void sincronizarEstadoSalaDesdeServidor() throws IOException {
-        String json = clienteRed.getRoomState();
+        String json = clienteRed.getRoomState(demoShowtime.getId());
         parseAndApplyRoomState(json);
     }
 
@@ -109,13 +123,12 @@ public class PuntoVentaVista extends BorderPane {
             for (Butaca butaca : demoRoom.getTodasLasButacas()) {
                 String serverStatus = statusMap.get(butaca.getId());
                 if (serverStatus != null) {
-                    applyStatusToSeat(butaca, serverStatus);
-                    if ("SELECTED".equals(serverStatus)) {
-                        BotonButaca btn = panelCuadriculaButacas.getSeatButton(butaca.getId());
-                        if (btn != null) {
-                            btn.setLockedByOther(true);
-                        }
-                    }
+                    // Bug 1-Cliente: Si el servidor reporta una butaca como SELECTED en el
+                    // snapshot inicial, significa que OTRO cliente la tiene bloqueada.
+                    // Localmente la tratamos como BOOKED para que sea no-interactuable.
+                    // No la agregamos a mySelectedSeatIds porque no es nuestra selección.
+                    String localStatus = "SELECTED".equals(serverStatus) ? "BOOKED" : serverStatus;
+                    applyStatusToSeat(butaca, localStatus);
                 }
             }
             panelCuadriculaButacas.refreshAllSeats();
@@ -163,24 +176,44 @@ public class PuntoVentaVista extends BorderPane {
         if (butaca.getEstado() == EstadoButaca.BOOKED || butaca.getEstado() == EstadoButaca.BROKEN) return;
 
         if (butaca.getEstado() == EstadoButaca.FREE) {
+            // Fix 1: el clienteRed llega en un hilo async; si aún no conectó, informar.
+            if (clienteRed == null) {
+                showAlert(Alert.AlertType.WARNING, "Sin conexión",
+                        "Todavía conectando al servidor. Intenta en un momento.");
+                return;
+            }
+
+            // Fix 3: evitar que dos clicks rápidos sobre la misma butaca spawnen
+            // dos hilos. Usamos el propio estado FREE→algo para bloquear:
+            // marcamos localmente antes de enviar, revertimos si el servidor rechaza.
+            butaca.seleccionar();                            // FREE → SELECTED (local, temporal)
+            panelCuadriculaButacas.refreshAllSeats();        // refrescar visual inmediatamente
+
             new Thread(() -> {
                 try {
-                    boolean ok = clienteRed.selectSeat(butaca.getId());
+                    String resp = clienteRed.selectSeatRaw(butaca.getId()); // devuelve línea cruda
                     Platform.runLater(() -> {
-                        if (ok) {
-                            butaca.seleccionar();
+                        if (resp != null && resp.startsWith(com.cine.compartido.Protocolo.OK)) {
+                            // Confirmado por el servidor
                             BotonButaca btn = panelCuadriculaButacas.getSeatButton(butaca.getId());
                             if (btn != null) btn.actualizarVisuales();
                             mySelectedSeatIds.add(butaca.getId());
                             mySelectedSeats.add(butaca);
                             updateUI();
                         } else {
-                            showAlert(Alert.AlertType.WARNING, "Butaca no disponible", "La butaca fue tomada por otro cliente.");
+                            // Fix 2: extraer mensaje real del servidor para mostrarlo.
+                            String serverMsg = resp != null && resp.contains(":")
+                                    ? resp.substring(resp.indexOf(':') + 1).trim()
+                                    : "Butaca no disponible.";
+                            // Revertir selección local
+                            try { butaca.liberar(); } catch (Exception ignored) {}
+                            panelCuadriculaButacas.refreshAllSeats();
+                            showAlert(Alert.AlertType.WARNING, "Butaca no disponible", serverMsg);
                         }
                     });
                 } catch (IOException e) {
                     Platform.runLater(() -> {
-                        butaca.seleccionar();
+                        // Sin red: mantener la selección local (modo offline)
                         mySelectedSeatIds.add(butaca.getId());
                         mySelectedSeats.add(butaca);
                         updateUI();
@@ -188,7 +221,9 @@ public class PuntoVentaVista extends BorderPane {
                 }
             }, "seleccionar-thread").start();
 
-        } else if (butaca.getEstado() == EstadoButaca.SELECTED) {
+        } else if (butaca.getEstado() == EstadoButaca.SELECTED
+                && mySelectedSeatIds.contains(butaca.getId())) {
+            // Bug 6: solo des-seleccionar si la butaca realmente pertenece a este cliente.
             new Thread(() -> {
                 try {
                     if (clienteRed != null) clienteRed.deselectSeat(butaca.getId());
@@ -202,6 +237,7 @@ public class PuntoVentaVista extends BorderPane {
             }, "deselect-thread").start();
         }
     }
+
 
     private void manejarRemoverButaca(Butaca butaca) {
         new Thread(() -> {
@@ -243,8 +279,8 @@ public class PuntoVentaVista extends BorderPane {
         new Thread(() -> {
             try {
                 String refCode = clienteRed != null
-                        ? clienteRed.bookSeats(seatIds, dni)
-                        : "LOCAL-" + UUID.randomUUID().toString().substring(0, 6);
+                        ? clienteRed.bookSeats(seatIds, dni, demoShowtime.getId())
+                        : "LOCAL-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
                 Platform.runLater(() -> {
                     if (refCode != null) {
@@ -259,8 +295,12 @@ public class PuntoVentaVista extends BorderPane {
                         mySelectedSeats.clear();
                         panelSeleccion.clearDniInput();
                         updateUI();
-                        showAlert(Alert.AlertType.INFORMATION, "Compra confirmada",
-                                seatsSnap.size() + " butaca(s) reservadas.\nRef: " + refCode);
+
+                        // Marcar sesión como manejada ANTES de mostrar la boleta,
+                        // para que onSessionExpired no muestre el dialog de "Atención finalizada".
+                        sessionHandled.set(true);
+                        mostrarBoleta(refCode, dni, seatsSnap);
+                        com.cine.cliente.ui.GestorVistas.navegarA(new PantallaInicio());
                     } else {
                         showAlert(Alert.AlertType.ERROR, "Error en la compra",
                                 "El servidor rechazó la operación. Intenta nuevamente.");
@@ -275,6 +315,124 @@ public class PuntoVentaVista extends BorderPane {
                     showAlert(Alert.AlertType.ERROR, "Error de red", e.getMessage()));
             }
         }, "book-thread").start();
+    }
+
+    /** Muestra la boleta de compra con todos los detalles de la transacción. */
+    private void mostrarBoleta(String refCode, String dni, List<Butaca> seats) {
+        javafx.scene.control.Dialog<javafx.scene.control.ButtonType> dialog =
+                new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Boleta de Compra");
+        dialog.setHeaderText(null);
+
+        javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(12);
+        content.setPadding(new javafx.geometry.Insets(24));
+        content.setStyle("-fx-background-color: #1a1a2e;");
+        content.setPrefWidth(420);
+
+        // Título de la película
+        javafx.scene.control.Label lblPeli = new javafx.scene.control.Label("🎬  " + demoMovie.getTitulo());
+        lblPeli.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;");
+        lblPeli.setWrapText(true);
+
+        // Separador
+        javafx.scene.control.Separator sep1 = new javafx.scene.control.Separator();
+        sep1.setStyle("-fx-background-color: #333;");
+
+        // Detalles de función
+        javafx.scene.control.Label lblCine = row("🏛️", demoCinema.getNombre() + "  ·  " + demoRoom.getNombre());
+        javafx.scene.control.Label lblFecha = row("📅", demoShowtime.getStartTime()
+                .format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMM yyyy",
+                        new java.util.Locale("es", "ES"))));
+        javafx.scene.control.Label lblHora = row("🕐", demoShowtime.getStartTime()
+                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+        javafx.scene.control.Label lblFormato = row("🎬", demoShowtime.getFormat().name());
+
+        // Butacas
+        String butacasStr = seats.stream()
+                .map(b -> b.getFila() + b.getNumero() + " (" + b.getTipo().displayName() + ")")
+                .collect(java.util.stream.Collectors.joining(",  "));
+        javafx.scene.control.Label lblButacas = row("🪯", butacasStr);
+        lblButacas.setWrapText(true);
+
+        // DNI
+        String dniDisplay = (dni != null && !dni.isBlank()) ? dni : "Anónimo";
+        javafx.scene.control.Label lblDni = row("👤", "DNI / ID: " + dniDisplay);
+
+        javafx.scene.control.Separator sep2 = new javafx.scene.control.Separator();
+        sep2.setStyle("-fx-background-color: #444;");
+
+        // Precio total
+        double total = seats.stream()
+                .mapToDouble(b -> motor.calcularPrecio(b, demoShowtime))
+                .sum();
+        javafx.scene.control.Label lblPrecio = new javafx.scene.control.Label(
+                String.format("Total pagado:  $%.2f", total));
+        lblPrecio.setStyle("-fx-font-size: 15px; -fx-text-fill: #aaaaaa;");
+
+        // Código de referencia (destacado)
+        javafx.scene.control.Label lblRef = new javafx.scene.control.Label(refCode);
+        lblRef.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #f1c40f; "
+                + "-fx-background-color: #2a2a00; -fx-padding: 10 18; -fx-background-radius: 6;");
+        lblRef.setAlignment(javafx.geometry.Pos.CENTER);
+        lblRef.setMaxWidth(Double.MAX_VALUE);
+
+        javafx.scene.control.Label lblRefTitulo = new javafx.scene.control.Label("Código de referencia");
+        lblRefTitulo.setStyle("-fx-text-fill: #888888; -fx-font-size: 11px;");
+
+        javafx.scene.control.Button btnDownloadPdf = new javafx.scene.control.Button("📥 Descargar Boleta PDF");
+        btnDownloadPdf.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold;");
+        btnDownloadPdf.setOnAction(e -> {
+            List<Boleto> boletos = new ArrayList<>();
+            for (Butaca b : seats) {
+                Boleto boleto = new Boleto.Builder()
+                        .butaca(b)
+                        .funcion(demoShowtime)
+                        .buyerIdNumber(dni)
+                        .pricePaid(motor.calcularPrecio(b, demoShowtime))
+                        .originalPrice(motor.calcularPrecio(b, demoShowtime))
+                        .referenceCode(refCode)
+                        .build();
+                boletos.add(boleto);
+            }
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Guardar Boleta PDF");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+            fc.setInitialFileName("Boleta_" + refCode + ".pdf");
+            File file = fc.showSaveDialog(getScene().getWindow());
+            if (file != null) {
+                try {
+                    GeneradorPdfBoleto.generateToFile(boletos.get(0), file.toPath()); // genera el primero? no, generateBatch
+                    if (boletos.size() > 1) {
+                         GeneradorPdfBoleto.generateBatch(boletos); // Retorna byte[], hagamos generateToFile pero no hay método para list en disco directo
+                    }
+                    // Escribir bytes a disco:
+                    byte[] pdfBytes = boletos.size() > 1 ? GeneradorPdfBoleto.generateBatch(boletos) : GeneradorPdfBoleto.generate(boletos.get(0));
+                    java.nio.file.Files.write(file.toPath(), pdfBytes);
+                    showAlert(Alert.AlertType.INFORMATION, "PDF Guardado", "La boleta se guardó en: " + file.getAbsolutePath());
+                } catch (Exception ex) {
+                    showAlert(Alert.AlertType.ERROR, "Error", "No se pudo guardar el PDF: " + ex.getMessage());
+                }
+            }
+        });
+
+        content.getChildren().addAll(
+                lblPeli, sep1,
+                lblCine, lblFecha, lblHora, lblFormato, lblButacas, lblDni,
+                sep2, lblPrecio, lblRefTitulo, lblRef, btnDownloadPdf);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setStyle("-fx-background-color: #1a1a2e;");
+        dialog.getDialogPane().getButtonTypes().add(
+                new javafx.scene.control.ButtonType("Listo ✓",
+                        javafx.scene.control.ButtonBar.ButtonData.OK_DONE));
+        dialog.showAndWait();
+    }
+
+    /** Helper para crear una fila de icono + texto en la boleta. */
+    private javafx.scene.control.Label row(String icon, String text) {
+        javafx.scene.control.Label lbl = new javafx.scene.control.Label(icon + "  " + text);
+        lbl.setStyle("-fx-text-fill: #cccccc; -fx-font-size: 13px;");
+        return lbl;
     }
 
     private void onSeatUpdateReceived(String seatId, String netStatus) {
@@ -302,13 +460,14 @@ public class PuntoVentaVista extends BorderPane {
     }
 
     private void onSessionExpired() {
+        // Si manejarConfirmar ya marcó sessionHandled=true (compra exitosa),
+        // no hacemos nada aquí — la navegación la gestiona manejarConfirmar.
+        if (!sessionHandled.compareAndSet(false, true)) return;
         if (clienteRed != null) {
             clienteRed.disconnect();
             clienteRed = null;
         }
-        showAlert(Alert.AlertType.WARNING, "Atención finalizada", 
-            "El tiempo de sesión ha culminado o la transacción ha sido completada.");
-        // Regresar a pantalla de inicio
+        // Navegar silenciosamente sin mostrar ningún diálogo de "sesión expirada".
         Platform.runLater(() -> com.cine.cliente.ui.GestorVistas.navegarA(new PantallaInicio()));
     }
 

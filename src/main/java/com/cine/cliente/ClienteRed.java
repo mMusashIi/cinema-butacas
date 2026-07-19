@@ -141,8 +141,9 @@ public class ClienteRed {
     // API pública
     // ─────────────────────────────────────────────────────────────────────
 
-    public String getRoomState() throws IOException {
-        String resp = sendAndWait(Protocolo.OBTENER_SALA);
+    public String getRoomState(String funcionId) throws IOException {
+        String req = funcionId != null ? Protocolo.OBTENER_SALA + Protocolo.SEP + funcionId : Protocolo.OBTENER_SALA;
+        String resp = sendAndWait(req);
         if (resp.startsWith(Protocolo.ESTADO_SALA + Protocolo.SEP)) {
             return resp.substring(Protocolo.ESTADO_SALA.length() + 1);
         }
@@ -154,15 +155,21 @@ public class ClienteRed {
         return resp.startsWith(Protocolo.OK);
     }
 
+    /** Igual que selectSeat pero devuelve la línea cruda del servidor (OK o ERROR:msg). */
+    public String selectSeatRaw(String seatId) throws IOException {
+        return sendAndWait(Protocolo.SELECCIONAR + Protocolo.SEP + seatId);
+    }
+
     public boolean deselectSeat(String seatId) throws IOException {
         String resp = sendAndWait(Protocolo.DESELECCIONAR + Protocolo.SEP + seatId);
         return resp.startsWith(Protocolo.OK);
     }
 
-    public String bookSeats(List<String> seatIds, String dni) throws IOException {
+    public String bookSeats(List<String> seatIds, String dni, String funcionId) throws IOException {
         String seatsStr = String.join(Protocolo.SEP_SUB, seatIds);
         String dniStr = (dni != null && !dni.trim().isEmpty()) ? dni.trim() : "";
-        String resp = sendAndWait(Protocolo.RESERVAR + Protocolo.SEP + seatsStr + Protocolo.SEP + dniStr);
+        String funcIdStr = funcionId != null ? funcionId : "";
+        String resp = sendAndWait(Protocolo.RESERVAR + Protocolo.SEP + seatsStr + Protocolo.SEP + dniStr + Protocolo.SEP + funcIdStr);
         if (resp.startsWith(Protocolo.OK)) {
             String[] parts = resp.split(Protocolo.SEP, 2);
             return parts.length == 2 ? parts[1] : "TK-OK";
@@ -170,8 +177,8 @@ public class ClienteRed {
         return null;
     }
 
-    public boolean crearSala(String nombre, int filas, int columnas, String matrizCSV) throws IOException {
-        String payload = nombre + Protocolo.SEP + filas + Protocolo.SEP + columnas + Protocolo.SEP + matrizCSV;
+    public boolean crearSala(String cineId, String nombre, int filas, int columnas, String matrizCSV) throws IOException {
+        String payload = cineId + Protocolo.SEP + nombre + Protocolo.SEP + filas + Protocolo.SEP + columnas + Protocolo.SEP + matrizCSV;
         String resp = sendAndWait(Protocolo.CREAR_SALA + Protocolo.SEP + payload);
         return resp.startsWith(Protocolo.OK);
     }
@@ -220,6 +227,14 @@ public class ClienteRed {
             return resp.substring(Protocolo.RESPUESTA_SALAS.length() + 1);
         }
         throw new IOException("Respuesta inesperada: " + resp);
+    }
+
+    public String listarReservas() throws IOException {
+        String resp = sendAndWait(Protocolo.LISTAR_RESERVAS);
+        if (resp.startsWith(Protocolo.RESPUESTA_RESERVAS + Protocolo.SEP)) {
+            return resp.substring(Protocolo.RESPUESTA_RESERVAS.length() + 1);
+        }
+        return "[]";
     }
 
     public boolean crearPelicula(String titulo, int duracion, String clasificacion) throws IOException {

@@ -6,24 +6,28 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-//import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 
 public class PanelAdminVista extends BorderPane {
 
-    private ClienteRed cliente;
-
+    // Bug 4: sin estado compartido de red — cada operación crea
+    // su propio ClienteRed para evitar condiciones de carrera en el socket.
     // Para almacenar IDs asociados a los nombres en los ComboBox
     private java.util.Map<String, String> peliculaMap = new java.util.HashMap<>();
     private java.util.Map<String, String> salaMap = new java.util.HashMap<>();
 
     public PanelAdminVista() {
         setStyle("-fx-background-color: #121212;");
-        cliente = new ClienteRed();
+        // Bug 4: ya no instanciamos un ClienteRed compartido aquí.
 
         // Cabecera superior
         HBox header = new HBox(20);
@@ -52,12 +56,22 @@ public class PanelAdminVista extends BorderPane {
         VBox panelFunciones = crearPanelFunciones();
         Tab tabFunciones = new Tab("Funciones", wrapInScrollPane(panelFunciones));
 
-        tabPane.getTabs().addAll(tabPeliculas, tabCines, tabSalas, tabFunciones);
+        Tab tabCompras = new Tab("Compras", crearPanelCompras());
+
+        tabPane.getTabs().addAll(tabPeliculas, tabCines, tabSalas, tabFunciones, tabCompras);
 
         // Cargar datos cuando se seleccione la pestaña de funciones
         tabFunciones.setOnSelectionChanged(e -> {
             if (tabFunciones.isSelected()) {
                 cargarDatosFunciones();
+            }
+        });
+
+        // Cargar compras al seleccionar la pestaña
+        tabCompras.setOnSelectionChanged(e -> {
+            if (tabCompras.isSelected()) {
+                VBox panel = (VBox) ((ScrollPane) tabCompras.getContent()).getContent();
+                cargarCompras((TableView<CompraItem>) panel.getChildren().get(2)); // El índice 2 es la tabla (lbl, btn, table)
             }
         });
 
@@ -100,9 +114,10 @@ public class PanelAdminVista extends BorderPane {
             try {
                 int dur = Integer.parseInt(durStr);
                 new Thread(() -> {
+                    ClienteRed c = new ClienteRed();
                     try {
-                        cliente.connect(null, null, null, null);
-                        boolean exito = cliente.crearPelicula(tit, dur, clas);
+                        c.connect(null, null, null, null);
+                        boolean exito = c.crearPelicula(tit, dur, clas);
                         Platform.runLater(() -> {
                             if (exito) {
                                 mostrarAlerta(Alert.AlertType.INFORMATION, "Película creada exitosamente");
@@ -117,7 +132,7 @@ public class PanelAdminVista extends BorderPane {
                         Platform.runLater(
                                 () -> mostrarAlerta(Alert.AlertType.ERROR, "Error de red: " + ex.getMessage()));
                     } finally {
-                        cliente.disconnect();
+                        c.disconnect();
                     }
                 }).start();
             } catch (NumberFormatException ex) {
@@ -157,9 +172,10 @@ public class PanelAdminVista extends BorderPane {
                 return;
             }
             new Thread(() -> {
+                ClienteRed c = new ClienteRed();
                 try {
-                    cliente.connect(null, null, null, null);
-                    boolean exito = cliente.crearCine(nom, dir, ciu);
+                    c.connect(null, null, null, null);
+                    boolean exito = c.crearCine(nom, dir, ciu);
                     Platform.runLater(() -> {
                         if (exito) {
                             mostrarAlerta(Alert.AlertType.INFORMATION, "Cine creado exitosamente");
@@ -173,7 +189,7 @@ public class PanelAdminVista extends BorderPane {
                 } catch (Exception ex) {
                     Platform.runLater(() -> mostrarAlerta(Alert.AlertType.ERROR, "Error de red: " + ex.getMessage()));
                 } finally {
-                    cliente.disconnect();
+                    c.disconnect();
                 }
             }).start();
         });
@@ -204,11 +220,19 @@ public class PanelAdminVista extends BorderPane {
         comboSala = new ComboBox<>();
         comboSala.setPromptText("Seleccione Sala");
 
-        TextField txtFechaHora = new TextField();
-        txtFechaHora.setPromptText("Fecha y Hora (ej. 2026-07-11T20:30)");
+        // Separar fecha y hora en campos distintos
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.setPromptText("Fecha");
+        datePicker.setStyle("-fx-background-color: #1e1e2e; -fx-text-fill: white;");
 
-        TextField txtFormato = new TextField();
-        txtFormato.setPromptText("Formato (ej. _2D, _3D, IMAX)");
+        TextField txtHora = new TextField();
+        txtHora.setPromptText("Hora (ej. 20:30)");
+
+        HBox fechaHoraBox = new HBox(10, datePicker, txtHora);
+
+        ComboBox<com.cine.dominio.FormatoFuncion> comboFormato = new ComboBox<>();
+        comboFormato.getItems().addAll(com.cine.dominio.FormatoFuncion.values());
+        comboFormato.setPromptText("Seleccione Formato");
 
         TextField txtPrecio = new TextField();
         txtPrecio.setPromptText("Precio Base (ej. 15.0)");
@@ -217,27 +241,31 @@ public class PanelAdminVista extends BorderPane {
         btnGuardar.setOnAction(e -> {
             String peliSel = comboPelicula.getValue();
             String salaSel = comboSala.getValue();
-            if (peliSel == null || salaSel == null) {
-                mostrarAlerta(Alert.AlertType.WARNING, "Debe seleccionar una película y una sala");
+            com.cine.dominio.FormatoFuncion formatoSel = comboFormato.getValue();
+            if (peliSel == null || salaSel == null || formatoSel == null) {
+                mostrarAlerta(Alert.AlertType.WARNING, "Debe seleccionar una película, una sala y un formato");
                 return;
             }
             String peliId = peliculaMap.get(peliSel);
             String salaId = salaMap.get(salaSel);
 
             try {
-                LocalDateTime hora = LocalDateTime.parse(txtFechaHora.getText());
-                com.cine.dominio.FormatoFuncion formato = com.cine.dominio.FormatoFuncion.valueOf(txtFormato.getText());
+                LocalDate fecha = datePicker.getValue();
+                LocalTime hora  = LocalTime.parse(txtHora.getText().trim());
+                LocalDateTime fechaHora = LocalDateTime.of(fecha, hora);
+                com.cine.dominio.FormatoFuncion formato = formatoSel;
                 double precio = Double.parseDouble(txtPrecio.getText());
 
                 new Thread(() -> {
+                    ClienteRed c = new ClienteRed();
                     try {
-                        cliente.connect(null, null, null, null);
-                        boolean exito = cliente.crearFuncion(salaId, peliId, hora, formato, precio);
+                        c.connect(null, null, null, null);
+                        boolean exito = c.crearFuncion(salaId, peliId, fechaHora, formato, precio);
                         Platform.runLater(() -> {
                             if (exito) {
                                 mostrarAlerta(Alert.AlertType.INFORMATION, "Función creada exitosamente");
-                                txtFechaHora.clear();
-                                txtFormato.clear();
+                                txtHora.clear();
+                                comboFormato.setValue(null);
                                 txtPrecio.clear();
                             } else {
                                 mostrarAlerta(Alert.AlertType.ERROR, "Error al crear función");
@@ -247,27 +275,133 @@ public class PanelAdminVista extends BorderPane {
                         Platform.runLater(
                                 () -> mostrarAlerta(Alert.AlertType.ERROR, "Error de red: " + ex.getMessage()));
                     } finally {
-                        cliente.disconnect();
+                        c.disconnect();
                     }
                 }).start();
+            } catch (DateTimeParseException ex) {
+                mostrarAlerta(Alert.AlertType.ERROR, "Hora inválida. Usa formato HH:mm (ej. 20:30)");
             } catch (Exception ex) {
-                mostrarAlerta(Alert.AlertType.ERROR, "Error en formato de datos (Fecha, Formato o Precio)");
+                mostrarAlerta(Alert.AlertType.ERROR, "Error en datos: " + ex.getMessage());
             }
         });
 
         Label lbl1 = new Label("Nueva Función:");
         lbl1.setStyle("-fx-text-fill: white;");
-        panel.getChildren().addAll(lblTitulo, lbl1, comboPelicula, comboSala, txtFechaHora, txtFormato, txtPrecio,
+        panel.getChildren().addAll(lblTitulo, lbl1, comboPelicula, comboSala, fechaHoraBox, comboFormato, txtPrecio,
                 btnGuardar);
         return panel;
     }
 
+    public static class CompraItem {
+        private final String ref;
+        private final String dni;
+        private final String pelicula;
+        private final String sala;
+        private final String cine;
+        private final String horario;
+        private final String butacas;
+        private final String fecha;
+
+        public CompraItem(String ref, String dni, String pelicula, String sala, String cine, String horario, String butacas, String fecha) {
+            this.ref = ref; this.dni = dni; this.pelicula = pelicula; this.sala = sala;
+            this.cine = cine; this.horario = horario; this.butacas = butacas; this.fecha = fecha;
+        }
+
+        public String getRef() { return ref; }
+        public String getDni() { return dni; }
+        public String getPelicula() { return pelicula; }
+        public String getSala() { return sala; }
+        public String getCine() { return cine; }
+        public String getHorario() { return horario; }
+        public String getButacas() { return butacas; }
+        public String getFecha() { return fecha; }
+    }
+
+    private ScrollPane crearPanelCompras() {
+        TableView<CompraItem> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setStyle("-fx-background-color: #1e1e1e; -fx-text-fill: white;");
+        table.setPlaceholder(new Label("Sin compras registradas."));
+
+        String[][] cols = {
+            {"Referencia", "ref"}, {"DNI", "dni"}, {"Película", "pelicula"},
+            {"Sala", "sala"}, {"Cine", "cine"}, {"Horario", "horario"},
+            {"Butacas", "butacas"}, {"Fecha", "fecha"}
+        };
+        for (String[] col : cols) {
+            TableColumn<CompraItem, String> tc = new TableColumn<>(col[0]);
+            tc.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>(col[1]));
+            tc.setStyle("-fx-text-fill: white;");
+            table.getColumns().add(tc);
+        }
+
+        Button btnRefrescar = new Button("↻ Actualizar");
+        btnRefrescar.setStyle("-fx-cursor: hand; -fx-background-color: #2563eb; -fx-text-fill: white;");
+        btnRefrescar.setOnAction(e -> cargarCompras(table));
+
+        Label lblTitulo = new Label("Historial de Compras");
+        lblTitulo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        VBox panel = new VBox(15, lblTitulo, btnRefrescar, table);
+        panel.setPadding(new Insets(20));
+        VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
+        panel.setStyle("-fx-background-color: #121212;");
+
+        ScrollPane sp = new ScrollPane(panel);
+        sp.setFitToWidth(true);
+        sp.setFitToHeight(true);
+        return sp;
+    }
+
+    private void cargarCompras(TableView<CompraItem> table) {
+        new Thread(() -> {
+            ClienteRed c = new ClienteRed();
+            try {
+                c.connect(null, null, null, null);
+                String json = c.listarReservas();
+                java.util.List<CompraItem> rows = parseReservasJson(json);
+                Platform.runLater(() -> {
+                    table.getItems().setAll(rows);
+                });
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                c.disconnect();
+            }
+        }).start();
+    }
+
+    /** Parsea el JSON de reservas devuelto por el servidor en una lista de objetos CompraItem. */
+    private java.util.List<CompraItem> parseReservasJson(String json) {
+        java.util.List<CompraItem> result = new java.util.ArrayList<>();
+        if (json == null || json.equals("[]")) return result;
+        String[] objs = json.replaceAll("^\\[|\\]$", "").split("\\},\\{");
+        for (String o : objs) {
+            o = o.replace("{", "").replace("}", "");
+            result.add(new CompraItem(
+                nvl(extractField(o, "ref")),
+                nvl(extractField(o, "dni")),
+                nvl(extractField(o, "pelicula")),
+                nvl(extractField(o, "sala")),
+                nvl(extractField(o, "cine")),
+                nvl(extractField(o, "horario")),
+                nvl(extractField(o, "butacas")),
+                nvl(extractField(o, "fecha"))
+            ));
+        }
+        return result;
+    }
+
+    private static String nvl(String s) { return s != null ? s : ""; }
+
+
     private void cargarDatosFunciones() {
         new Thread(() -> {
+            ClienteRed c = new ClienteRed();
             try {
-                cliente.connect(null, null, null, null);
-                String jsonPelis = cliente.listarPeliculas();
-                String jsonSalas = cliente.listarSalas();
+                c.connect(null, null, null, null);
+                String jsonPelis = c.listarPeliculas();
+                String jsonSalas = c.listarSalas();
 
                 Platform.runLater(() -> {
                     peliculaMap.clear();
@@ -301,7 +435,7 @@ public class PanelAdminVista extends BorderPane {
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                cliente.disconnect();
+                c.disconnect();
             }
         }).start();
     }

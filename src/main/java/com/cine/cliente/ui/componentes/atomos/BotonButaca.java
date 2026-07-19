@@ -112,8 +112,8 @@ public class BotonButaca extends Button {
 
             case BOOKED ->
                 setStyle(shapeStyle
-                        + "-fx-background-color: #111111; "
-                        + "-fx-text-fill: #444444; -fx-cursor: default;");
+                        + "-fx-background-color: #f1c40f; "
+                        + "-fx-text-fill: #111111; -fx-cursor: default;");
 
             case BROKEN ->
                 setStyle(shapeStyle

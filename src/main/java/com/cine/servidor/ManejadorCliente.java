@@ -152,8 +152,13 @@ public class ManejadorCliente implements Runnable {
 
         if (msg.equals(Protocolo.PING)) {
             sendMessage(Protocolo.PONG);
-        } else if (msg.equals(Protocolo.OBTENER_SALA)) {
-            handleGetRoom();
+        } else if (msg.startsWith(Protocolo.OBTENER_SALA)) {
+            String[] parts = msg.split(Protocolo.SEP);
+            if (parts.length > 1) {
+                handleGetRoom(parts[1]);
+            } else {
+                handleGetRoom(null);
+            }
         } else if (msg.startsWith(Protocolo.SELECCIONAR + Protocolo.SEP)) {
             handleSelect(msg.substring(Protocolo.SELECCIONAR.length() + 1));
         } else if (msg.startsWith(Protocolo.DESELECCIONAR + Protocolo.SEP)) {
@@ -179,13 +184,15 @@ public class ManejadorCliente implements Runnable {
             handleCrearSala(msg.substring(Protocolo.CREAR_SALA.length() + 1));
         } else if (msg.startsWith(Protocolo.CREAR_FUNCION + Protocolo.SEP)) {
             handleCrearFuncion(msg.substring(Protocolo.CREAR_FUNCION.length() + 1));
+        } else if (msg.equals(Protocolo.LISTAR_RESERVAS)) {
+            sendMessage(Protocolo.RESPUESTA_RESERVAS + Protocolo.SEP + state.getReservasJson());
         } else {
             sendMessage(Protocolo.error("Comando desconocido: " + msg));
         }
     }
 
-    private void handleGetRoom() {
-        sendMessage(Protocolo.roomState(state.getRoomStateJson()));
+    private void handleGetRoom(String funcionId) {
+        sendMessage(Protocolo.roomState(state.getRoomStateJson(funcionId)));
     }
 
     private void handleSelect(String seatId) {
@@ -229,11 +236,12 @@ public class ManejadorCliente implements Runnable {
     }
 
     private void handleBook(String payload) {
-        String[] parts = payload.split(Protocolo.SEP, 2);
+        String[] parts = payload.split(Protocolo.SEP, 3);
         if (parts.length < 1) { sendMessage(Protocolo.error("Formato inválido")); return; }
 
         String[] seatIds = parts[0].split(Protocolo.SEP_SUB);
-        String dni = (parts.length == 2) ? parts[1].trim() : "";
+        String dni = (parts.length >= 2) ? parts[1].trim() : "";
+        String funcionId = (parts.length >= 3) ? parts[2].trim() : null;
 
         for (String sid : seatIds) {
             if (!lockManager.isLockedBy(sid.trim(), clientId)) {
@@ -246,8 +254,13 @@ public class ManejadorCliente implements Runnable {
         try {
             issued = state.confirmPurchase(
                     Arrays.stream(seatIds).map(String::trim).toList(),
-                    dni.isEmpty() ? null : dni);
+                    dni.isEmpty() ? null : dni,
+                    funcionId);
         } catch (IllegalStateException ex) {
+            // Liberar locks: el rollback de confirmPurchase ya liberó las butacas
+            // a FREE en memoria, pero los locks del lockManager siguen activos.
+            // Sin esto, las butacas quedarían Free+Locked hasta que expire la sesión.
+            for (String sid : seatIds) lockManager.releaseLock(sid.trim(), clientId);
             sendMessage(Protocolo.error(ex.getMessage()));
             return;
         }

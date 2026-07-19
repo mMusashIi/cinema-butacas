@@ -51,6 +51,7 @@ public final class Protocolo {
     public static final String CREAR_FUNCION = "CREAR_FUNCION";
     public static final String CREAR_SALA = "CREAR_SALA";
     public static final String CREAR_CINE = "CREAR_CINE";
+    public static final String LISTAR_RESERVAS = "LISTAR_RESERVAS";
 
     // ── Respuestas Servidor → Cliente ─────────────────────────────────────
     public static final String ESTADO_SALA   = "ESTADO_SALA";
@@ -65,6 +66,7 @@ public final class Protocolo {
     public static final String RESPUESTA_CINES = "RESPUESTA_CINES";
     public static final String RESPUESTA_PELICULAS = "RESPUESTA_PELICULAS";
     public static final String RESPUESTA_SALAS = "RESPUESTA_SALAS";
+    public static final String RESPUESTA_RESERVAS = "RESPUESTA_RESERVAS";
 
     // ── Separadores ───────────────────────────────────────────────────────
     public static final String SEP     = ":";  // separador principal
@@ -99,5 +101,10 @@ public final class Protocolo {
 
     public static String roomState(String json) {
         return ESTADO_SALA + SEP + json;
+    }
+
+    /** Helper antiguo para compatibilidad interna. */
+    public static String estadoSala(String json) {
+        return roomState(json);
     }
 }
