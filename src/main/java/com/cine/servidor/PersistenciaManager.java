@@ -98,7 +98,11 @@ public class PersistenciaManager {
                             Pelicula pel = estado.getPeliculasMap().get(parts[1]);
                             SalaCine sal = estado.getSalasMap().get(parts[2]);
                             if (pel != null && sal != null) {
-                                Funcion fun = new Funcion(parts[0], pel, sal, LocalTime.parse(parts[3]));
+                                String timeStr = parts[3];
+                                if (timeStr.contains("T")) {
+                                    timeStr = timeStr.split("T")[1];
+                                }
+                                Funcion fun = new Funcion(parts[0], pel, sal, LocalTime.parse(timeStr));
                                 if (parts.length > 4) {
                                     fun.setActivo(Boolean.parseBoolean(parts[4]));
                                     if (parts.length > 5) {

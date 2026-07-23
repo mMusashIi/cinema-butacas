@@ -187,7 +187,7 @@ public class EstadoServidor {
         
         // Generar Boleta
         Boleta b = new Boleta(funcId, f.getPelicula().getNombre(), f.getSala().getNombre(), 
-                              f.getHoraInicio(), fechaReservada, metodoPago, lockIds, dni);
+                              java.time.LocalDateTime.of(fechaReservada, f.getHoraInicio()), fechaReservada, metodoPago, lockIds, dni);
         boletas.put(b.getId(), b);
         PersistenciaManager.guardar(this);
         
@@ -243,7 +243,14 @@ public class EstadoServidor {
             String conteo = getConteoButacas(f.getId(), fechaStr);
             String[] partes = conteo.split("\\|");
             
-            boolean terminada = f.estaTerminada();
+            java.time.LocalDate fechaConsulta;
+            try {
+                fechaConsulta = java.time.LocalDate.parse(fechaStr);
+            } catch (Exception e) {
+                fechaConsulta = java.time.LocalDate.now();
+            }
+            java.time.LocalDateTime dt = java.time.LocalDateTime.of(fechaConsulta, f.getHoraInicio());
+            boolean terminada = java.time.LocalDateTime.now().isAfter(dt.plusMinutes(f.getPelicula().getDuracionMinutos()));
             
             sb.append(String.format("{\"id\":\"%s\",\"pelicula\":\"%s\",\"sala\":\"%s\",\"hora\":\"%s\",\"libres\":%s,\"total\":%s,\"duracion\":%d,\"terminada\":%b,\"activo\":%b,\"eliminada\":%b}", 
                       f.getId(), f.getPelicula().getNombre(), f.getSala().getNombre(), f.getHoraInicio().toString(), partes[1], partes[0], f.getPelicula().getDuracionMinutos(), terminada, f.isActivo(), f.isEliminada()));
