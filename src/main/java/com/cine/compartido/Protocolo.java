@@ -55,6 +55,16 @@ public final class Protocolo {
     public static final String LISTAR_BOLETAS = "LISTAR_BOLETAS";
     public static final String LISTAR_TODAS_BOLETAS = "LISTAR_TODAS_BOLETAS";
     public static final String CANCELAR_BOLETA = "CANCELAR_BOLETA";
+    
+    public static final String ACTIVAR_PELICULA = "ACTIVAR_PELICULA";
+    public static final String DESACTIVAR_PELICULA = "DESACTIVAR_PELICULA";
+    public static final String ACTIVAR_SALA = "ACTIVAR_SALA";
+    public static final String DESACTIVAR_SALA = "DESACTIVAR_SALA";
+    public static final String ACTIVAR_FUNCION = "ACTIVAR_FUNCION";
+    public static final String DESACTIVAR_FUNCION = "DESACTIVAR_FUNCION";
+    public static final String ELIMINAR_FUNCION = "ELIMINAR_FUNCION";
+    
+    
     /** Solicita el conteo de butacas (total|libres|ocupados) de una función. */
     public static final String CONTEO_BUTACAS   = "CONTEO_BUTACAS";
 

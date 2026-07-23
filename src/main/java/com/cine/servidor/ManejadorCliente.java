@@ -114,6 +114,27 @@ public class ManejadorCliente implements Runnable {
                 // pero state.cancelarBoleta ya libera los asientos. Faltaría un broadcast de cada asiento liberado:
                 // Por simplicidad, los clientes actualizarán la matriz al volver a entrar, pero podemos emitir:
                 // (Omitido por simplicidad de la prueba)
+            } else if (msg.startsWith(Protocolo.ACTIVAR_PELICULA + Protocolo.SEP)) {
+                state.activarPelicula(msg.substring(Protocolo.ACTIVAR_PELICULA.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.DESACTIVAR_PELICULA + Protocolo.SEP)) {
+                state.desactivarPelicula(msg.substring(Protocolo.DESACTIVAR_PELICULA.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.ACTIVAR_SALA + Protocolo.SEP)) {
+                state.activarSala(msg.substring(Protocolo.ACTIVAR_SALA.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.DESACTIVAR_SALA + Protocolo.SEP)) {
+                state.desactivarSala(msg.substring(Protocolo.DESACTIVAR_SALA.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.ACTIVAR_FUNCION + Protocolo.SEP)) {
+                state.activarFuncion(msg.substring(Protocolo.ACTIVAR_FUNCION.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.DESACTIVAR_FUNCION + Protocolo.SEP)) {
+                state.desactivarFuncion(msg.substring(Protocolo.DESACTIVAR_FUNCION.length() + 1));
+                sendMessage(Protocolo.OK);
+            } else if (msg.startsWith(Protocolo.ELIMINAR_FUNCION + Protocolo.SEP)) {
+                state.eliminarFuncion(msg.substring(Protocolo.ELIMINAR_FUNCION.length() + 1));
+                sendMessage(Protocolo.OK);
             } else {
                 sendMessage(Protocolo.error("Comando desconocido: " + msg));
             }
@@ -214,10 +235,11 @@ public class ManejadorCliente implements Runnable {
         String[] parts = payload.split(Protocolo.SEP, 3);
         String salaId = parts[0];
         String peliculaId = parts[1];
-        LocalDateTime hora = LocalDateTime.parse(parts[2]);
+        java.time.LocalTime hora = java.time.LocalTime.parse(parts[2]);
         state.crearFuncion(salaId, peliculaId, hora);
         sendMessage(Protocolo.OK);
     }
+    
 
     // // [RUTINA]: Procedimiento de desconexión segura (limpieza de recursos y liberación de locks).
     private void onDisconnect(boolean serverInitiated) {

@@ -4,6 +4,7 @@ import com.cine.dominio.*;
 import java.io.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 public class PersistenciaManager {
@@ -23,17 +24,17 @@ public class PersistenciaManager {
                         matriz.append("|");
                     }
                 }
-                writer.println(s.getId() + ";" + s.getNombre() + ";" + s.getTotalRows() + ";" + s.getTotalColumns() + ";" + matriz.toString());
+                writer.println(s.getId() + ";" + s.getNombre() + ";" + s.getTotalRows() + ";" + s.getTotalColumns() + ";" + s.isActivo() + ";" + matriz.toString());
             }
 
             writer.println("---PELICULAS---");
             for (Pelicula p : estado.getPeliculasMap().values()) {
-                writer.println(p.getId() + ";" + p.getNombre() + ";" + p.getDuracionMinutos());
+                writer.println(p.getId() + ";" + p.getNombre() + ";" + p.getDuracionMinutos() + ";" + p.isActivo());
             }
 
             writer.println("---FUNCIONES---");
             for (Funcion f : estado.getFuncionesMap().values()) {
-                writer.println(f.getId() + ";" + f.getPelicula().getId() + ";" + f.getSala().getId() + ";" + f.getHoraInicio().toString());
+                writer.println(f.getId() + ";" + f.getPelicula().getId() + ";" + f.getSala().getId() + ";" + f.getHoraInicio().toString() + ";" + f.isActivo() + ";" + f.isEliminada());
             }
 
             writer.println("---BOLETAS---");
@@ -64,9 +65,14 @@ public class PersistenciaManager {
                 try {
                     switch (seccion) {
                         case "---SALAS---":
-                            // id;nombre;filas;columnas;matriz
+                            // id;nombre;filas;columnas;[activo;]matriz
                             SalaCine sala = new SalaCine(parts[0], parts[1], Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-                            String[] celda = parts[4].split("\\|");
+                            int matrizIdx = 4;
+                            if (parts.length > 5 && (parts[4].equals("true") || parts[4].equals("false"))) {
+                                sala.setActivo(Boolean.parseBoolean(parts[4]));
+                                matrizIdx = 5;
+                            }
+                            String[] celda = parts[matrizIdx].split("\\|");
                             int idx = 0;
                             for (int r = 0; r < sala.getTotalRows(); r++) {
                                 for (int c = 0; c < sala.getTotalColumns(); c++) {
@@ -83,13 +89,22 @@ public class PersistenciaManager {
                             break;
                         case "---PELICULAS---":
                             Pelicula p = new Pelicula(parts[0], parts[1], Integer.parseInt(parts[2]));
+                            if (parts.length > 3) {
+                                p.setActivo(Boolean.parseBoolean(parts[3]));
+                            }
                             estado.getPeliculasMap().put(p.getId(), p);
                             break;
                         case "---FUNCIONES---":
                             Pelicula pel = estado.getPeliculasMap().get(parts[1]);
                             SalaCine sal = estado.getSalasMap().get(parts[2]);
                             if (pel != null && sal != null) {
-                                Funcion fun = new Funcion(parts[0], pel, sal, LocalDateTime.parse(parts[3]));
+                                Funcion fun = new Funcion(parts[0], pel, sal, LocalTime.parse(parts[3]));
+                                if (parts.length > 4) {
+                                    fun.setActivo(Boolean.parseBoolean(parts[4]));
+                                    if (parts.length > 5) {
+                                        fun.setEliminada(Boolean.parseBoolean(parts[5]));
+                                    }
+                                }
                                 estado.getFuncionesMap().put(fun.getId(), fun);
                             }
                             break;

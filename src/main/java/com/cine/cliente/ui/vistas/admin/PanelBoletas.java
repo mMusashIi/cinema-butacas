@@ -70,10 +70,20 @@ public class PanelBoletas extends VBox {
         btnLimpiar.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
         btnLimpiar.setOnAction(e -> limpiarFiltros());
         
+        Button btnLimpiarFecha = new Button("✕");
+        btnLimpiarFecha.setStyle("-fx-background-color: #555; -fx-text-fill: white; -fx-cursor: hand; -fx-font-size: 10px;");
+        btnLimpiarFecha.setTooltip(new Tooltip("Limpiar fecha (ver todas)"));
+        btnLimpiarFecha.setOnAction(e -> {
+            dpFecha.setValue(null);
+            actualizarFiltrosYTabla();
+        });
+        HBox fechaBox = new HBox(4, dpFecha, btnLimpiarFecha);
+        fechaBox.setAlignment(Pos.CENTER_LEFT);
+
         filtrosPane.getChildren().addAll(
                 crearFiltroControl("Película:", cmbPelicula),
                 crearFiltroControl("Sala:", cmbSala),
-                crearFiltroControl("Fecha:", dpFecha),
+                crearFiltroControl("Fecha (Todo si vacío):", fechaBox),
                 crearFiltroControl("Hora:", cmbHora),
                 btnRefrescar,
                 btnLimpiar
@@ -93,7 +103,7 @@ public class PanelBoletas extends VBox {
         cargarTodasLasBoletas();
     }
 
-    private VBox crearFiltroControl(String labelText, Control control) {
+    private VBox crearFiltroControl(String labelText, javafx.scene.Node control) {
         Label label = new Label(labelText);
         label.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
         VBox box = new VBox(5, label, control);

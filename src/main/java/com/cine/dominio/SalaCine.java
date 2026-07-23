@@ -30,6 +30,7 @@ public class SalaCine {
     private final int totalFilas; // Número de filas (altura de la matriz)
     private final int totalColumnas; // Número de columnas (ancho de la matriz)
     private final Butaca[][] seatingMatrix; // null = espacio vacío
+    private boolean activo = true;
 
     /**
      * Constructor. La matriz se inicializa completa (todas las celdas con Butaca
@@ -199,6 +200,14 @@ public class SalaCine {
 
     public int getTotalColumns() {
         return totalColumnas;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
     }
 
     @Override

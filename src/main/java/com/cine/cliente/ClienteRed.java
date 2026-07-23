@@ -221,11 +221,21 @@ public class ClienteRed {
         return resp.startsWith(Protocolo.OK);
     }
 
-    public boolean crearFuncion(String salaId, String peliculaId, LocalDateTime horaInicio) throws IOException {
+    public boolean crearFuncion(String salaId, String peliculaId, java.time.LocalTime horaInicio) throws IOException {
         String payload = salaId + Protocolo.SEP + peliculaId + Protocolo.SEP + horaInicio.toString();
         String resp = sendAndWait(Protocolo.CREAR_FUNCION + Protocolo.SEP + payload);
         return resp.startsWith(Protocolo.OK);
     }
+
+    public boolean activarPelicula(String id) throws IOException { return sendAndWait(Protocolo.ACTIVAR_PELICULA + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean desactivarPelicula(String id) throws IOException { return sendAndWait(Protocolo.DESACTIVAR_PELICULA + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean activarSala(String id) throws IOException { return sendAndWait(Protocolo.ACTIVAR_SALA + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean desactivarSala(String id) throws IOException { return sendAndWait(Protocolo.DESACTIVAR_SALA + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean activarFuncion(String id) throws IOException { return sendAndWait(Protocolo.ACTIVAR_FUNCION + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean desactivarFuncion(String id) throws IOException { return sendAndWait(Protocolo.DESACTIVAR_FUNCION + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+    public boolean eliminarFuncion(String id) throws IOException { return sendAndWait(Protocolo.ELIMINAR_FUNCION + Protocolo.SEP + id).startsWith(Protocolo.OK); }
+
+
 
     public void disconnect() {
         running = false;

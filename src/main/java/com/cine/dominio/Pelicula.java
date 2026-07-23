@@ -9,6 +9,7 @@ public class Pelicula {
     private final String id;
     private final String nombre;
     private final int duracionMinutos;
+    private boolean activo = true;
 
     public Pelicula(String nombre, int duracionMinutos) {
         this(nombre, nombre, duracionMinutos);
@@ -36,6 +37,14 @@ public class Pelicula {
 
     public int getDuracionMinutos() {
         return duracionMinutos;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
     }
 
     @Override

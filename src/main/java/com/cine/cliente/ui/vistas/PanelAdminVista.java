@@ -4,29 +4,31 @@ import com.cine.cliente.ClienteRed;
 import com.cine.cliente.ui.GestorVistas;
 import com.cine.cliente.ui.vistas.admin.PanelEditorSala;
 import javafx.application.Platform;
+import javafx.beans.property.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class PanelAdminVista extends BorderPane {
 
     private final ClienteRed cliente;
     private final PantallaInicio pantallaInicio;
 
-    private Map<String, String> peliculaMap = new HashMap<>();
-    private Map<String, String> salaMap = new HashMap<>();
+    private ObservableList<PeliculaModel> peliculasList = FXCollections.observableArrayList();
+    private ObservableList<SalaModel> salasList = FXCollections.observableArrayList();
+    private ObservableList<FuncionModel> funcionesList = FXCollections.observableArrayList();
 
     public PanelAdminVista(ClienteRed cliente, PantallaInicio pantallaInicio) {
         this.cliente = cliente;
         this.pantallaInicio = pantallaInicio;
-
         setStyle("-fx-background-color: #121212;");
 
         // Cabecera superior
@@ -49,244 +51,359 @@ public class PanelAdminVista extends BorderPane {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab tabPeliculas = new Tab("Peliculas", wrapInScrollPane(crearPanelPeliculas()));
-        Tab tabSalas = new Tab("Salas", new PanelEditorSala(cliente));
-        
-        VBox panelFunciones = crearPanelFunciones();
-        Tab tabFunciones = new Tab("Funciones", wrapInScrollPane(panelFunciones));
+        Tab tabPeliculas = new Tab("Películas", crearPanelPeliculas());
+        Tab tabSalasLista = new Tab("Salas (Lista)", crearPanelSalas());
+        Tab tabSalasEditor = new Tab("Editor de Sala", new PanelEditorSala(cliente));
+        Tab tabFunciones = new Tab("Funciones", crearPanelFunciones());
         Tab tabBoletas = new Tab("Boletas", new com.cine.cliente.ui.vistas.admin.PanelBoletas(cliente));
         
-        tabPane.getTabs().addAll(tabPeliculas, tabSalas, tabFunciones, tabBoletas);
+        tabPane.getTabs().addAll(tabPeliculas, tabSalasLista, tabSalasEditor, tabFunciones, tabBoletas);
 
-        tabFunciones.setOnSelectionChanged(e -> {
-            if (tabFunciones.isSelected()) {
-                cargarDatosFunciones();
-            }
+        tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            cargarDatos();
         });
 
         setCenter(tabPane);
+        cargarDatos();
     }
 
-    private ScrollPane wrapInScrollPane(javafx.scene.Node content) {
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        return scrollPane;
-    }
-
-    private VBox crearPanelPeliculas() {
-        VBox panel = new VBox(15);
-        panel.setPadding(new Insets(20));
-        panel.setAlignment(Pos.TOP_LEFT);
-
-        Label lblTitulo = new Label("Gestión de Películas");
-        lblTitulo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
-
-        TextField txtTitulo = new TextField();
-        txtTitulo.setPromptText("Título de la película");
-
-        TextField txtDuracion = new TextField();
-        txtDuracion.setPromptText("Duración (minutos)");
-
-        Button btnGuardar = new Button("Crear Película");
-        btnGuardar.setOnAction(e -> {
-            String tit = txtTitulo.getText();
-            String durStr = txtDuracion.getText();
-            if (tit.isEmpty() || durStr.isEmpty()) {
-                mostrarAlerta(Alert.AlertType.WARNING, "Todos los campos son requeridos");
-                return;
-            }
-            try {
-                int dur = Integer.parseInt(durStr);
-                new Thread(() -> {
-                    try {
-                        boolean exito = cliente.crearPelicula(tit, dur);
-                        Platform.runLater(() -> {
-                            if (exito) {
-                                mostrarAlerta(Alert.AlertType.INFORMATION, "Película creada exitosamente");
-                                txtTitulo.clear();
-                                txtDuracion.clear();
-                            } else {
-                                mostrarAlerta(Alert.AlertType.ERROR, "Error al crear película");
-                            }
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> mostrarAlerta(Alert.AlertType.ERROR, "Error de red: " + ex.getMessage()));
-                    }
-                }).start();
-            } catch (NumberFormatException ex) {
-                mostrarAlerta(Alert.AlertType.WARNING, "La duración debe ser un número entero");
-            }
-        });
-
-        Label lbl1 = new Label("Añadir nueva película:");
-        lbl1.setStyle("-fx-text-fill: white;");
-        panel.getChildren().addAll(lblTitulo, lbl1, txtTitulo, txtDuracion, btnGuardar);
-        return panel;
-    }
-
-    // UI de funciones
-    private FlowPane flowPeliculas;
-    private ToggleGroup tgPeliculas;
-    
-    private VBox seccionSalaYHora;
-    private FlowPane flowSalas;
-    private ToggleGroup tgSalas;
-    private TextField txtHora;
-    
-    private VBox crearPanelFunciones() {
-        VBox panel = new VBox(20);
-        panel.setPadding(new Insets(20));
-
-        Label lblTitulo = new Label("Programación de Funciones");
-        lblTitulo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
-
-        // Sección 1: Elegir Película
-        Label lblPelicula = new Label("1. Seleccione una Película:");
-        lblPelicula.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
-        
-        flowPeliculas = new FlowPane();
-        flowPeliculas.setHgap(10);
-        flowPeliculas.setVgap(10);
-        tgPeliculas = new ToggleGroup();
-        
-        tgPeliculas.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                seccionSalaYHora.setVisible(true);
-            }
-        });
-
-        // Sección 2: Sala, Hora y Guardar (Oculto inicialmente)
-        seccionSalaYHora = new VBox(15);
-        seccionSalaYHora.setVisible(false);
-        
-        Label lblSala = new Label("2. Seleccione una Sala:");
-        lblSala.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
-        
-        flowSalas = new FlowPane();
-        flowSalas.setHgap(10);
-        flowSalas.setVgap(10);
-        tgSalas = new ToggleGroup();
-        
-        Label lblHora = new Label("3. Ingrese la hora:");
-        lblHora.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
-        
-        txtHora = new TextField();
-        txtHora.setPromptText("Hora (ej. 20:30)");
-        txtHora.setMaxWidth(150);
-
-        Button btnGuardar = new Button("+ Agregar Función");
-        btnGuardar.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold;");
-        btnGuardar.setOnAction(e -> guardarFuncion());
-
-        seccionSalaYHora.getChildren().addAll(lblSala, flowSalas, lblHora, txtHora, btnGuardar);
-        
-        panel.getChildren().addAll(lblTitulo, lblPelicula, flowPeliculas, seccionSalaYHora);
-        return panel;
-    }
-
-    private void cargarDatosFunciones() {
+    private void cargarDatos() {
         new Thread(() -> {
             try {
                 String jsonPelis = cliente.listarPeliculas();
                 String jsonSalas = cliente.listarSalas();
+                String jsonFunc = cliente.listarFunciones(LocalDate.now().toString()); // Hoy (como base, backend no filtra igual)
 
                 Platform.runLater(() -> {
-                    peliculaMap.clear();
-                    flowPeliculas.getChildren().clear();
+                    peliculasList.clear();
                     if (!jsonPelis.equals("[]") && jsonPelis.length() > 2) {
                         String[] arr = jsonPelis.replaceAll("^\\[|\\]$", "").split("\\},\\{");
                         for (String s : arr) {
                             s = s.replace("{", "").replace("}", "");
                             String id = extractField(s, "id");
-                            String tit = extractField(s, "nombre"); // Depende de cómo serialice el server, puede ser nombre o titulo
-                            if (tit == null) tit = extractField(s, "titulo");
-                            if (tit == null) tit = "Película " + id.substring(0, 4);
-
-                            peliculaMap.put(tit, id);
-                            ToggleButton tb = new ToggleButton(tit);
-                            tb.setUserData(id);
-                            tb.setToggleGroup(tgPeliculas);
-                            flowPeliculas.getChildren().add(tb);
+                            String tit = extractField(s, "nombre");
+                            int dur = Integer.parseInt(extractField(s, "duracion"));
+                            boolean act = "true".equals(extractField(s, "activo"));
+                            peliculasList.add(new PeliculaModel(id, tit, dur, act));
                         }
-                    } else {
-                        Label empty = new Label("No hay películas.");
-                        empty.setStyle("-fx-text-fill: gray;");
-                        flowPeliculas.getChildren().add(empty);
                     }
 
-                    salaMap.clear();
-                    flowSalas.getChildren().clear();
+                    salasList.clear();
                     if (!jsonSalas.equals("[]") && jsonSalas.length() > 2) {
                         String[] arr = jsonSalas.replaceAll("^\\[|\\]$", "").split("\\},\\{");
                         for (String s : arr) {
                             s = s.replace("{", "").replace("}", "");
                             String id = extractField(s, "id");
                             String nom = extractField(s, "nombre");
-                            
-                            salaMap.put(nom, id);
-                            ToggleButton tb = new ToggleButton(nom);
-                            tb.setUserData(id);
-                            tb.setToggleGroup(tgSalas);
-                            flowSalas.getChildren().add(tb);
+                            int filas = Integer.parseInt(extractField(s, "filas"));
+                            int cols = Integer.parseInt(extractField(s, "columnas"));
+                            boolean act = "true".equals(extractField(s, "activo"));
+                            salasList.add(new SalaModel(id, nom, filas, cols, act));
                         }
-                    } else {
-                        Label empty = new Label("No hay salas.");
-                        empty.setStyle("-fx-text-fill: gray;");
-                        flowSalas.getChildren().add(empty);
+                    }
+
+                    funcionesList.clear();
+                    if (!jsonFunc.equals("[]") && jsonFunc.length() > 2) {
+                        String[] arr = jsonFunc.replaceAll("^\\[|\\]$", "").split("\\},\\{");
+                        for (String s : arr) {
+                            s = s.replace("{", "").replace("}", "");
+                            String id = extractField(s, "id");
+                            String pel = extractField(s, "pelicula");
+                            String sal = extractField(s, "sala");
+                            String horStr = extractField(s, "hora");
+                            boolean act = "true".equals(extractField(s, "activo"));
+                            boolean eli = "true".equals(extractField(s, "eliminada"));
+                            
+                            if (eli) continue; // Skip soft deleted
+
+                            try {
+                                LocalTime horaDT = LocalTime.parse(horStr);
+                                funcionesList.add(new FuncionModel(id, pel, sal, horaDT.toString(), act));
+                            } catch (Exception x) {
+                                // Fallback por si la db tiene datos viejos mal parseados en el cache del server
+                            }
+                        }
                     }
                     
-                    // Resetear estado visual
-                    seccionSalaYHora.setVisible(false);
-                    if (tgPeliculas.getSelectedToggle() != null) tgPeliculas.getSelectedToggle().setSelected(false);
-                    if (tgSalas.getSelectedToggle() != null) tgSalas.getSelectedToggle().setSelected(false);
+                    actualizarCombosFuncion();
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> mostrarAlerta(Alert.AlertType.ERROR, "Error al cargar datos: " + e.getMessage()));
+                // Ignore load errors silently for smooth UI
             }
         }).start();
     }
-    
-    private void guardarFuncion() {
-        Toggle peliSel = tgPeliculas.getSelectedToggle();
-        Toggle salaSel = tgSalas.getSelectedToggle();
-        
-        if (peliSel == null) {
-            mostrarAlerta(Alert.AlertType.WARNING, "Debe seleccionar una película.");
-            return;
-        }
-        if (salaSel == null) {
-            mostrarAlerta(Alert.AlertType.WARNING, "Debe seleccionar una sala.");
-            return;
-        }
-        
-        String peliId = (String) peliSel.getUserData();
-        String salaId = (String) salaSel.getUserData();
-        
-        try {
-            LocalTime hora = LocalTime.parse(txtHora.getText().trim());
-            // Usamos la fecha de hoy ya que solo es un horario diario
-            LocalDateTime fechaHora = LocalDateTime.of(LocalDate.now(), hora);
 
-            new Thread(() -> {
-                try {
-                    boolean exito = cliente.crearFuncion(salaId, peliId, fechaHora);
-                    Platform.runLater(() -> {
-                        if (exito) {
-                            mostrarAlerta(Alert.AlertType.INFORMATION, "Función creada exitosamente");
-                            txtHora.clear();
-                            salaSel.setSelected(false);
-                        } else {
-                            mostrarAlerta(Alert.AlertType.ERROR, "Error al crear función");
-                        }
-                    });
-                } catch (Exception ex) {
-                    Platform.runLater(() -> mostrarAlerta(Alert.AlertType.ERROR, "Error de red: " + ex.getMessage()));
+    // --- Panel Peliculas ---
+    private VBox crearPanelPeliculas() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        HBox form = new HBox(10);
+        form.setAlignment(Pos.CENTER_LEFT);
+        TextField txtTitulo = new TextField();
+        txtTitulo.setPromptText("Título");
+        TextField txtDuracion = new TextField();
+        txtDuracion.setPromptText("Duración (min)");
+        Button btnGuardar = new Button("Crear Película");
+        btnGuardar.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
+        
+        Label lblForm = new Label("Nueva Película:");
+        lblForm.setStyle("-fx-text-fill: white;");
+        form.getChildren().addAll(lblForm, txtTitulo, txtDuracion, btnGuardar);
+
+        TableView<PeliculaModel> tabla = new TableView<>();
+        tabla.setItems(peliculasList);
+        
+        TableColumn<PeliculaModel, String> colNom = new TableColumn<>("Nombre");
+        colNom.setCellValueFactory(new PropertyValueFactory<>("nombre"));
+        TableColumn<PeliculaModel, Integer> colDur = new TableColumn<>("Duración (m)");
+        colDur.setCellValueFactory(new PropertyValueFactory<>("duracion"));
+        TableColumn<PeliculaModel, Boolean> colAct = new TableColumn<>("Estado");
+        colAct.setCellValueFactory(new PropertyValueFactory<>("activo"));
+        
+        TableColumn<PeliculaModel, Void> colAcciones = new TableColumn<>("Acciones");
+        colAcciones.setCellFactory(param -> new TableCell<>() {
+            private final Button btn = new Button();
+            {
+                btn.setOnAction(event -> {
+                    PeliculaModel p = getTableView().getItems().get(getIndex());
+                    togglePelicula(p);
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    PeliculaModel p = getTableView().getItems().get(getIndex());
+                    btn.setText(p.isActivo() ? "Desactivar" : "Activar");
+                    btn.setStyle(p.isActivo() ? "-fx-background-color: #f39c12; -fx-text-fill: white;" : "-fx-background-color: #2ecc71; -fx-text-fill: white;");
+                    setGraphic(btn);
                 }
-            }).start();
-        } catch (DateTimeParseException ex) {
-            mostrarAlerta(Alert.AlertType.ERROR, "Hora inválida. Usa formato HH:mm (ej. 20:30)");
-        }
+            }
+        });
+
+        tabla.getColumns().addAll(colNom, colDur, colAct, colAcciones);
+        VBox.setVgrow(tabla, Priority.ALWAYS);
+
+        btnGuardar.setOnAction(e -> {
+            try {
+                int dur = Integer.parseInt(txtDuracion.getText());
+                new Thread(() -> {
+                    try {
+                        if (cliente.crearPelicula(txtTitulo.getText(), dur)) {
+                            Platform.runLater(() -> {
+                                txtTitulo.clear(); txtDuracion.clear();
+                                cargarDatos();
+                            });
+                        }
+                    } catch (Exception ex) {}
+                }).start();
+            } catch (Exception ex) {}
+        });
+
+        panel.getChildren().addAll(form, tabla);
+        return panel;
+    }
+
+    // --- Panel Salas ---
+    private VBox crearPanelSalas() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+        
+        Label info = new Label("Las salas se crean y editan desde la pestaña 'Editor de Sala'.");
+        info.setStyle("-fx-text-fill: #aaa; -fx-font-style: italic;");
+
+        TableView<SalaModel> tabla = new TableView<>();
+        tabla.setItems(salasList);
+        
+        TableColumn<SalaModel, String> colNom = new TableColumn<>("Nombre");
+        colNom.setCellValueFactory(new PropertyValueFactory<>("nombre"));
+        TableColumn<SalaModel, Integer> colFilas = new TableColumn<>("Filas");
+        colFilas.setCellValueFactory(new PropertyValueFactory<>("filas"));
+        TableColumn<SalaModel, Integer> colCols = new TableColumn<>("Columnas");
+        colCols.setCellValueFactory(new PropertyValueFactory<>("columnas"));
+        TableColumn<SalaModel, Boolean> colAct = new TableColumn<>("Estado");
+        colAct.setCellValueFactory(new PropertyValueFactory<>("activo"));
+        
+        TableColumn<SalaModel, Void> colAcciones = new TableColumn<>("Acciones");
+        colAcciones.setCellFactory(param -> new TableCell<>() {
+            private final Button btn = new Button();
+            {
+                btn.setOnAction(event -> {
+                    SalaModel s = getTableView().getItems().get(getIndex());
+                    toggleSala(s);
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    SalaModel s = getTableView().getItems().get(getIndex());
+                    btn.setText(s.isActivo() ? "Desactivar" : "Activar");
+                    btn.setStyle(s.isActivo() ? "-fx-background-color: #f39c12; -fx-text-fill: white;" : "-fx-background-color: #2ecc71; -fx-text-fill: white;");
+                    setGraphic(btn);
+                }
+            }
+        });
+
+        tabla.getColumns().addAll(colNom, colFilas, colCols, colAct, colAcciones);
+        VBox.setVgrow(tabla, Priority.ALWAYS);
+
+        panel.getChildren().addAll(info, tabla);
+        return panel;
+    }
+
+    // --- Panel Funciones ---
+    private ComboBox<PeliculaModel> cmbPelicula = new ComboBox<>();
+    private ComboBox<SalaModel> cmbSala = new ComboBox<>();
+    
+    private void actualizarCombosFuncion() {
+        cmbPelicula.setItems(peliculasList);
+        cmbSala.setItems(salasList);
+    }
+
+    private VBox crearPanelFunciones() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        HBox form = new HBox(10);
+        form.setAlignment(Pos.CENTER_LEFT);
+        
+        cmbPelicula.setPromptText("Película");
+        cmbSala.setPromptText("Sala");
+        TextField txtHora = new TextField();
+        txtHora.setPromptText("Hora (HH:mm)");
+        
+        Button btnGuardar = new Button("Crear Función");
+        btnGuardar.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
+
+        Label lbl1 = new Label("Película:"); lbl1.setStyle("-fx-text-fill: white;");
+        Label lbl2 = new Label("Sala:"); lbl2.setStyle("-fx-text-fill: white;");
+        Label lbl4 = new Label("Hora:"); lbl4.setStyle("-fx-text-fill: white;");
+
+        form.getChildren().addAll(
+            new VBox(5, lbl1, cmbPelicula),
+            new VBox(5, lbl2, cmbSala),
+            new VBox(5, lbl4, txtHora),
+            new VBox(5, new Label(" "), btnGuardar)
+        );
+
+        TableView<FuncionModel> tabla = new TableView<>();
+        tabla.setItems(funcionesList);
+        
+        TableColumn<FuncionModel, String> colPel = new TableColumn<>("Película");
+        colPel.setCellValueFactory(new PropertyValueFactory<>("pelicula"));
+        TableColumn<FuncionModel, String> colSal = new TableColumn<>("Sala");
+        colSal.setCellValueFactory(new PropertyValueFactory<>("sala"));
+        TableColumn<FuncionModel, String> colHor = new TableColumn<>("Hora");
+        colHor.setCellValueFactory(new PropertyValueFactory<>("hora"));
+        TableColumn<FuncionModel, Boolean> colAct = new TableColumn<>("Estado");
+        colAct.setCellValueFactory(new PropertyValueFactory<>("activo"));
+        
+        TableColumn<FuncionModel, Void> colAcciones = new TableColumn<>("Acciones");
+        colAcciones.setCellFactory(param -> new TableCell<>() {
+            private final Button btnAct = new Button();
+            private final Button btnDel = new Button("Eliminar");
+            private final HBox bx = new HBox(5, btnAct, btnDel);
+            {
+                btnAct.setOnAction(event -> {
+                    FuncionModel f = getTableView().getItems().get(getIndex());
+                    toggleFuncion(f);
+                });
+                btnDel.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+                btnDel.setOnAction(event -> {
+                    FuncionModel f = getTableView().getItems().get(getIndex());
+                    eliminarFuncion(f);
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    FuncionModel f = getTableView().getItems().get(getIndex());
+                    btnAct.setText(f.isActivo() ? "Desactivar" : "Activar");
+                    btnAct.setStyle(f.isActivo() ? "-fx-background-color: #f39c12; -fx-text-fill: white;" : "-fx-background-color: #2ecc71; -fx-text-fill: white;");
+                    setGraphic(bx);
+                }
+            }
+        });
+
+        tabla.getColumns().addAll(colPel, colSal, colHor, colAct, colAcciones);
+        VBox.setVgrow(tabla, Priority.ALWAYS);
+
+        btnGuardar.setOnAction(e -> {
+            PeliculaModel p = cmbPelicula.getValue();
+            SalaModel s = cmbSala.getValue();
+            String hor = txtHora.getText();
+            if (p == null || s == null || hor.isEmpty()) {
+                mostrarAlerta(Alert.AlertType.WARNING, "Llene todos los campos.");
+                return;
+            }
+            try {
+                LocalTime ltime = LocalTime.parse(hor);
+                new Thread(() -> {
+                    try {
+                        if (cliente.crearFuncion(s.getId(), p.getId(), ltime)) {
+                            Platform.runLater(() -> {
+                                txtHora.clear();
+                                cargarDatos();
+                            });
+                        } else {
+                            Platform.runLater(() -> mostrarAlerta(Alert.AlertType.ERROR, "Error o cruce de horarios."));
+                        }
+                    } catch (Exception ex) {}
+                }).start();
+            } catch (Exception ex) {
+                mostrarAlerta(Alert.AlertType.ERROR, "Hora inválida (use HH:mm).");
+            }
+        });
+
+        panel.getChildren().addAll(form, tabla);
+        return panel;
+    }
+
+    // --- Acciones ---
+    private void togglePelicula(PeliculaModel p) {
+        new Thread(() -> {
+            try {
+                if (p.isActivo()) cliente.desactivarPelicula(p.getId());
+                else cliente.activarPelicula(p.getId());
+                Platform.runLater(this::cargarDatos);
+            } catch(Exception e){}
+        }).start();
+    }
+    private void toggleSala(SalaModel s) {
+        new Thread(() -> {
+            try {
+                if (s.isActivo()) cliente.desactivarSala(s.getId());
+                else cliente.activarSala(s.getId());
+                Platform.runLater(this::cargarDatos);
+            } catch(Exception e){}
+        }).start();
+    }
+    private void toggleFuncion(FuncionModel f) {
+        new Thread(() -> {
+            try {
+                if (f.isActivo()) cliente.desactivarFuncion(f.getId());
+                else cliente.activarFuncion(f.getId());
+                Platform.runLater(this::cargarDatos);
+            } catch(Exception e){}
+        }).start();
+    }
+    private void eliminarFuncion(FuncionModel f) {
+        new Thread(() -> {
+            try {
+                if (cliente.eliminarFuncion(f.getId())) {
+                    Platform.runLater(this::cargarDatos);
+                }
+            } catch(Exception e){}
+        }).start();
     }
 
     private void mostrarAlerta(Alert.AlertType tipo, String mensaje) {
@@ -312,5 +429,65 @@ public class PanelAdminVista extends BorderPane {
             int end = Math.min(endComa, endLlave);
             return json.substring(start, end);
         }
+    }
+
+    // --- Modelos Internos para TableView ---
+    public static class PeliculaModel {
+        private final StringProperty id;
+        private final StringProperty nombre;
+        private final IntegerProperty duracion;
+        private final BooleanProperty activo;
+        public PeliculaModel(String i, String n, int d, boolean a) {
+            id = new SimpleStringProperty(i);
+            nombre = new SimpleStringProperty(n);
+            duracion = new SimpleIntegerProperty(d);
+            activo = new SimpleBooleanProperty(a);
+        }
+        public String getId() { return id.get(); }
+        public String getNombre() { return nombre.get(); }
+        public int getDuracion() { return duracion.get(); }
+        public boolean isActivo() { return activo.get(); }
+        @Override public String toString() { return getNombre(); }
+    }
+
+    public static class SalaModel {
+        private final StringProperty id;
+        private final StringProperty nombre;
+        private final IntegerProperty filas;
+        private final IntegerProperty columnas;
+        private final BooleanProperty activo;
+        public SalaModel(String i, String n, int f, int c, boolean a) {
+            id = new SimpleStringProperty(i);
+            nombre = new SimpleStringProperty(n);
+            filas = new SimpleIntegerProperty(f);
+            columnas = new SimpleIntegerProperty(c);
+            activo = new SimpleBooleanProperty(a);
+        }
+        public String getId() { return id.get(); }
+        public String getNombre() { return nombre.get(); }
+        public int getFilas() { return filas.get(); }
+        public int getColumnas() { return columnas.get(); }
+        public boolean isActivo() { return activo.get(); }
+        @Override public String toString() { return getNombre(); }
+    }
+
+    public static class FuncionModel {
+        private final StringProperty id;
+        private final StringProperty pelicula;
+        private final StringProperty sala;
+        private final StringProperty hora;
+        private final BooleanProperty activo;
+        public FuncionModel(String i, String p, String s, String h, boolean a) {
+            id = new SimpleStringProperty(i);
+            pelicula = new SimpleStringProperty(p);
+            sala = new SimpleStringProperty(s);
+            hora = new SimpleStringProperty(h);
+            activo = new SimpleBooleanProperty(a);
+        }
+        public String getId() { return id.get(); }
+        public String getPelicula() { return pelicula.get(); }
+        public String getSala() { return sala.get(); }
+        public String getHora() { return hora.get(); }
+        public boolean isActivo() { return activo.get(); }
     }
 }

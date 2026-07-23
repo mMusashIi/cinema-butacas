@@ -1,7 +1,7 @@
 package com.cine.servidor;
 
 import com.cine.dominio.*;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -32,7 +32,6 @@ public class EstadoServidor {
     public Map<String, Pelicula> getPeliculasMap() { return peliculas; }
     public Map<String, Funcion> getFuncionesMap() { return funciones; }
     public Map<String, Boleta> getBoletasMap() { return boletas; }
-
     private void crearDatosDePrueba() {
         // Sala de prueba
         SalaCine sala1 = new SalaCine("Sala 1", 5, 5);
@@ -43,7 +42,7 @@ public class EstadoServidor {
         peliculas.put(p1.getId(), p1);
 
         // Función de prueba
-        LocalDateTime hora = LocalDateTime.now().plusDays(1).withHour(18).withMinute(0);
+        java.time.LocalTime hora = java.time.LocalTime.now().withHour(18).withMinute(0).withSecond(0).withNano(0);
         Funcion f1 = new Funcion(p1, sala1, hora);
         funciones.put(f1.getId(), f1);
     }
@@ -93,8 +92,7 @@ public class EstadoServidor {
         PersistenciaManager.guardar(this);
     }
 
-    // // [RUTINA]: Valida y registra una nueva función cinematográfica (horario y sala).
-    public void crearFuncion(String salaId, String peliculaId, LocalDateTime hora) {
+    public void crearFuncion(String salaId, String peliculaId, java.time.LocalTime hora) {
         SalaCine sala = salas.get(salaId);
         Pelicula pelicula = peliculas.get(peliculaId);
         if (sala == null || pelicula == null) {
@@ -154,6 +152,7 @@ public class EstadoServidor {
             if (butaca == null || butaca.getTipo() == TipoButaca.BROKEN || butaca.getTipo() == TipoButaca.PASILLO) {
                 return false;
             }
+            
         }
         
         return boletas.values().stream()
@@ -199,7 +198,7 @@ public class EstadoServidor {
         Boleta b = boletas.get(boletaId);
         if (b != null && b.getEstado() == EstadoBoleta.ACTIVA) {
             Funcion f = funciones.get(b.getFuncionId());
-            if (f != null && f.estaTerminada(b.getFechaReservada())) {
+            if (f != null) {
                 throw new IllegalStateException("No se puede cancelar una boleta de una función que ya ha terminado.");
             }
             b.setEstado(EstadoBoleta.CANCELADA);
@@ -215,8 +214,8 @@ public class EstadoServidor {
         List<SalaCine> list = new ArrayList<>(salas.values());
         for (int i = 0; i < list.size(); i++) {
             SalaCine s = list.get(i);
-            sb.append(String.format("{\"id\":\"%s\",\"nombre\":\"%s\",\"filas\":%d,\"columnas\":%d}", 
-                      s.getId(), s.getNombre(), s.getTotalRows(), s.getTotalColumns()));
+            sb.append(String.format("{\"id\":\"%s\",\"nombre\":\"%s\",\"filas\":%d,\"columnas\":%d,\"activo\":%b}", 
+                      s.getId(), s.getNombre(), s.getTotalRows(), s.getTotalColumns(), s.isActivo()));
             if (i < list.size() - 1) sb.append(",");
         }
         sb.append("]");
@@ -228,8 +227,8 @@ public class EstadoServidor {
         List<Pelicula> list = new ArrayList<>(peliculas.values());
         for (int i = 0; i < list.size(); i++) {
             Pelicula p = list.get(i);
-            sb.append(String.format("{\"id\":\"%s\",\"nombre\":\"%s\",\"duracion\":%d}", 
-                      p.getId(), p.getNombre(), p.getDuracionMinutos()));
+            sb.append(String.format("{\"id\":\"%s\",\"nombre\":\"%s\",\"duracion\":%d,\"activo\":%b}", 
+                      p.getId(), p.getNombre(), p.getDuracionMinutos(), p.isActivo()));
             if (i < list.size() - 1) sb.append(",");
         }
         sb.append("]");
@@ -244,10 +243,10 @@ public class EstadoServidor {
             String conteo = getConteoButacas(f.getId(), fechaStr);
             String[] partes = conteo.split("\\|");
             
-            boolean terminada = f.estaTerminada(java.time.LocalDate.parse(fechaStr));
+            boolean terminada = f.estaTerminada();
             
-            sb.append(String.format("{\"id\":\"%s\",\"pelicula\":\"%s\",\"sala\":\"%s\",\"hora\":\"%s\",\"libres\":%s,\"total\":%s,\"duracion\":%d,\"terminada\":%b}", 
-                      f.getId(), f.getPelicula().getNombre(), f.getSala().getNombre(), f.getHoraInicio().toString(), partes[1], partes[0], f.getPelicula().getDuracionMinutos(), terminada));
+            sb.append(String.format("{\"id\":\"%s\",\"pelicula\":\"%s\",\"sala\":\"%s\",\"hora\":\"%s\",\"libres\":%s,\"total\":%s,\"duracion\":%d,\"terminada\":%b,\"activo\":%b,\"eliminada\":%b}", 
+                      f.getId(), f.getPelicula().getNombre(), f.getSala().getNombre(), f.getHoraInicio().toString(), partes[1], partes[0], f.getPelicula().getDuracionMinutos(), terminada, f.isActivo(), f.isEliminada()));
             if (i < list.size() - 1) sb.append(",");
         }
         sb.append("]");
@@ -362,5 +361,38 @@ public class EstadoServidor {
         }
         return String.format("{\"id\":\"%s\",\"nombre\":\"%s\",\"filas\":%d,\"columnas\":%d,\"matriz\":\"%s\"}",
             s.getId(), s.getNombre(), s.getTotalRows(), s.getTotalColumns(), sb.toString());
+    }
+
+    public void activarPelicula(String id) {
+        Pelicula p = peliculas.get(id);
+        if (p != null) { p.setActivo(true); PersistenciaManager.guardar(this); }
+    }
+    public void desactivarPelicula(String id) {
+        Pelicula p = peliculas.get(id);
+        if (p != null) { p.setActivo(false); PersistenciaManager.guardar(this); }
+    }
+    public void activarSala(String id) {
+        SalaCine s = salas.get(id);
+        if (s != null) { s.setActivo(true); PersistenciaManager.guardar(this); }
+    }
+    public void desactivarSala(String id) {
+        SalaCine s = salas.get(id);
+        if (s != null) { s.setActivo(false); PersistenciaManager.guardar(this); }
+    }
+    public void activarFuncion(String id) {
+        Funcion f = funciones.get(id);
+        if (f != null) { f.setActivo(true); PersistenciaManager.guardar(this); }
+    }
+    public void desactivarFuncion(String id) {
+        Funcion f = funciones.get(id);
+        if (f != null) { f.setActivo(false); PersistenciaManager.guardar(this); }
+    }
+    public void eliminarFuncion(String id) {
+        Funcion f = funciones.get(id);
+        if (f != null) { 
+            // Soft delete
+            f.setEliminada(true); 
+            PersistenciaManager.guardar(this); 
+        }
     }
 }
