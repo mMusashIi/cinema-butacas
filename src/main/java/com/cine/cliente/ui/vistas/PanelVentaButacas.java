@@ -230,7 +230,8 @@ public class PanelVentaButacas extends BorderPane {
         
         for (int r = 0; r < numFilas; r++) {
             for (int c = 0; c < numCols; c++) {
-                if ("OCUPADO".equals(estadosMatriz[r][c])) {
+                String estado = estadosMatriz[r][c];
+                if ("OCUPADO".equals(estado) || "BROKEN".equals(estado)) {
                     BotonButacaSvg btn = cuadriculaSala.getBotonAt(r, c);
                     if (btn != null) btn.setDisable(true);
                 }
@@ -248,7 +249,8 @@ public class PanelVentaButacas extends BorderPane {
         BotonButacaSvg btn = cuadriculaSala.getBotonAt(fila, columna);
         if (btn == null) return;
         
-        if ("OCUPADO".equals(estadosMatriz[fila][columna])) return;
+        String estado = estadosMatriz[fila][columna];
+        if ("OCUPADO".equals(estado) || "BROKEN".equals(estado)) return;
         
         try {
             if (seleccionadas.contains(lockId)) {

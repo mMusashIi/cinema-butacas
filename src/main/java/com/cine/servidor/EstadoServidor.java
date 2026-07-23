@@ -143,6 +143,18 @@ public class EstadoServidor {
         if (parts.length < 3) return false;
         String funcionId = parts[0];
         String fechaStr = parts[1];
+        String butacaId = parts[2];
+        
+        Funcion f = funciones.get(funcionId);
+        if (f != null) {
+            SalaCine s = f.getSala();
+            Butaca butaca = s.getTodasLasButacas().stream()
+                .filter(b -> b.getId().equals(butacaId))
+                .findFirst().orElse(null);
+            if (butaca == null || butaca.getTipo() == TipoButaca.BROKEN || butaca.getTipo() == TipoButaca.PASILLO) {
+                return false;
+            }
+        }
         
         return boletas.values().stream()
             .filter(bol -> bol.getEstado() == com.cine.dominio.EstadoBoleta.ACTIVA)
