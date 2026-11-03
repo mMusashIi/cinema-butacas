@@ -229,3 +229,46 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ── a11y: estilos de los nuevos elementos accesibles (APF3) ── */
+
+/* Logo como <a>: sin subrayado */
+a.web-brand { text-decoration: none; }
+
+/* Nav links como <a>: sin subrayado, heredan estilo de .nav-link */
+.web-nav-links a.nav-link {
+  text-decoration: none;
+}
+.web-nav-links a.nav-link:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Footer links como <a> dentro de <li> */
+.footer-nav-link {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+.footer-nav-link:hover { color: var(--text-main); }
+.footer-nav-link:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Íconos sociales envueltos en <a> */
+.social-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-main);
+  border-radius: 4px;
+  transition: transform 0.2s, color 0.2s;
+}
+.social-icon-link:hover { transform: scale(1.1); color: var(--action-red); }
+.social-icon-link:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+}
