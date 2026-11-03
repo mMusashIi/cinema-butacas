@@ -31,14 +31,20 @@ export default function WebCinemaDetails() {
         
         <div className="cinema-details-header">
           <h1 className="cinema-title-blue">{cinema.name}</h1>
-          <div className="cinema-header-tabs">
+          <div className="cinema-header-tabs" role="tablist" aria-label="Secciones del cine">
             <button 
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'Horarios'}
               className={`cinema-tab-btn ${activeTab === 'Horarios' ? 'active' : ''}`}
               onClick={() => setActiveTab('Horarios')}
             >
               Horarios
             </button>
             <button 
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'Películas'}
               className={`cinema-tab-btn ${activeTab === 'Películas' ? 'active' : ''}`}
               onClick={() => setActiveTab('Películas')}
             >
@@ -48,7 +54,7 @@ export default function WebCinemaDetails() {
         </div>
 
         {activeTab === 'Horarios' && (
-          <div className="cinema-horarios-view">
+          <div className="cinema-horarios-view" role="tabpanel" aria-label="Horarios de funciones">
             <div className="cinema-horarios-controls">
               <CustomDropdown
                 label="Fecha"
@@ -65,8 +71,8 @@ export default function WebCinemaDetails() {
                   
                   <div className="cinema-movie-poster-col">
                     <div className="poster-wrapper">
-                      <img src={movie.poster} alt={movie.title} />
-                      {movie.featured && <div className="diagonal-tag">Estreno</div>}
+                      <img src={movie.poster} alt={`Póster de ${movie.title}`} />
+                      {movie.featured && <div className="diagonal-tag" aria-hidden="true">Estreno</div>}
                     </div>
                   </div>
                   
@@ -84,8 +90,10 @@ export default function WebCinemaDetails() {
                       {getShowtimes().map((st, index) => (
                         <button
                           key={index}
+                          type="button"
                           className={`showtime-btn ${!st.active ? 'disabled' : ''}`}
                           disabled={!st.active}
+                          aria-label={`Función ${st.active ? 'disponible' : 'no disponible'} a las ${st.time}`}
                           onClick={() => navigate('/web/compra', {
                             state: {
                               movie,
@@ -98,7 +106,7 @@ export default function WebCinemaDetails() {
                         >
                           <span className="time-lbl">{st.time}</span>
                           {st.active && (
-                            <span className="chair-icon" style={{display: 'flex'}}>
+                            <span className="chair-icon" style={{display: 'flex'}} aria-hidden="true">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M4 18v3"/><path d="M20 18v3"/><path d="M5 10V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5"/><path d="M3 10a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h18a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
                               </svg>
@@ -116,16 +124,22 @@ export default function WebCinemaDetails() {
         )}
 
         {activeTab === 'Películas' && (
-          <div className="cinema-peliculas-view">
+          <div className="cinema-peliculas-view" role="tabpanel" aria-label="Películas en este cine">
             <div className="movies-grid">
               {enabledMovies.map(movie => (
-                <div key={movie.id} className="movie-poster" onClick={() => navigate(`/web/pelicula/${movie.id}`)} style={{position: 'relative', cursor: 'pointer'}}>
-                  <img src={movie.poster} alt={movie.title} />
-                  {movie.featured && <div className="diagonal-tag">Estreno</div>}
-                  <div className="movie-hover-overlay">
+                <a
+                  key={movie.id}
+                  href={`/web/pelicula/${movie.id}`}
+                  className="movie-poster"
+                  aria-label={`Ver detalle de ${movie.title}`}
+                  style={{position: 'relative'}}
+                >
+                  <img src={movie.poster} alt={`Póster de ${movie.title}`} />
+                  {movie.featured && <div className="diagonal-tag" aria-hidden="true">Estreno</div>}
+                  <div className="movie-hover-overlay" aria-hidden="true">
                     <span>Ver detalle ⟩</span>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           </div>

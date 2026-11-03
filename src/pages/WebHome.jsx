@@ -42,25 +42,47 @@ export default function WebHome() {
   return (
     <>
       {/* Hero Banner */}
-      <section className="web-hero">
+      <section className="web-hero" aria-label="Destacados y promociones">
         <div className="hero-carousel">
-          <button className="carousel-control prev" onClick={() => setCurrentSlide(prev => (prev > 0 ? prev - 1 : 4))}>〈</button>
-          <img src={cineramaBanner} alt="Cinerama Banner" className="hero-img" />
-          <button className="carousel-control next" onClick={() => setCurrentSlide(prev => (prev < 4 ? prev + 1 : 0))}>〉</button>
-          <div className="carousel-indicators">
+          <button
+            type="button"
+            className="carousel-control prev"
+            aria-label="Diapositiva anterior"
+            onClick={() => setCurrentSlide(prev => (prev > 0 ? prev - 1 : 4))}
+          >
+            〈
+          </button>
+          <img
+            src={cineramaBanner}
+            alt="Cartelera y estrenos disponibles en Cinerama"
+            className="hero-img"
+          />
+          <button
+            type="button"
+            className="carousel-control next"
+            aria-label="Siguiente diapositiva"
+            onClick={() => setCurrentSlide(prev => (prev < 4 ? prev + 1 : 0))}
+          >
+            〉
+          </button>
+          <div className="carousel-indicators" role="tablist" aria-label="Selector de diapositiva">
             {[0, 1, 2, 3, 4].map((idx) => (
-              <span 
-                key={idx} 
+              <button
+                key={idx}
+                type="button"
+                role="tab"
+                aria-label={`Ir a la diapositiva ${idx + 1}`}
+                aria-selected={currentSlide === idx}
                 className={`dot ${currentSlide === idx ? 'active' : ''}`}
                 onClick={() => setCurrentSlide(idx)}
-              ></span>
+              />
             ))}
           </div>
         </div>
       </section>
 
       {/* Buscador de Funciones */}
-      <section className="web-search-bar">
+      <section className="web-search-bar" aria-label="Buscador de funciones">
         <div className="search-filters">
           <CustomDropdown
             label="Por Película"
@@ -70,7 +92,7 @@ export default function WebHome() {
             onChange={setSelectedMovie}
           />
           
-          <div className="filter-divider"></div>
+          <div className="filter-divider" aria-hidden="true"></div>
           
           <CustomDropdown
             label="Por Ciudad"
@@ -80,7 +102,7 @@ export default function WebHome() {
             onChange={setSelectedCity}
           />
           
-          <div className="filter-divider"></div>
+          <div className="filter-divider" aria-hidden="true"></div>
           
           <CustomDropdown
             label="Por Cine"
@@ -90,7 +112,7 @@ export default function WebHome() {
             onChange={setSelectedCinema}
           />
           
-          <div className="filter-divider"></div>
+          <div className="filter-divider" aria-hidden="true"></div>
           
           <CustomDropdown
             label="Por Fecha"
@@ -100,47 +122,62 @@ export default function WebHome() {
             onChange={setSelectedDate}
           />
           
-          <button className="btn-buscar" onClick={handleSearch}>Buscar</button>
+          <button type="button" className="btn-buscar" onClick={handleSearch}>Buscar</button>
         </div>
       </section>
 
       {/* Cartelera */}
-      <section className="web-movies-section">
-        <h2 className="section-title">Peliculas</h2>
+      <section className="web-movies-section" aria-label="Catálogo de películas">
+        <h2 className="section-title">Películas</h2>
         
         <div className="movies-header">
-          <div className="movies-tabs">
+          <div className="movies-tabs" role="tablist" aria-label="Categorías de películas">
             <button 
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'cartelera'}
               className={`tab-btn ${activeTab === 'cartelera' ? 'active' : ''}`}
               onClick={() => setActiveTab('cartelera')}
             >
               En Cartelera
             </button>
             <button 
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'preventa'}
               className={`tab-btn ${activeTab === 'preventa' ? 'active' : ''}`}
               onClick={() => setActiveTab('preventa')}
             >
               En Preventa
             </button>
             <button 
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'proximamente'}
               className={`tab-btn ${activeTab === 'proximamente' ? 'active' : ''}`}
               onClick={() => setActiveTab('proximamente')}
             >
-              Proximamente
+              Próximamente
             </button>
           </div>
-          <button className="btn-catalogo" onClick={() => navigate('/web/peliculas')}>Ver catalogo</button>
+          <button type="button" className="btn-catalogo" onClick={() => navigate('/web/peliculas')}>Ver catálogo</button>
         </div>
-        <div className="movies-divider"></div>
+        <div className="movies-divider" aria-hidden="true"></div>
 
         <div className="movies-grid">
           {enabledMovies.slice(0, 5).map(movie => (
-            <div key={movie.id} className="movie-poster" onClick={() => navigate(`/web/pelicula/${movie.id}`)} style={{position: 'relative'}}>
-              <img src={movie.poster} alt={movie.title} />
-              <div className="movie-hover-overlay">
+            <a
+              key={movie.id}
+              href={`/web/pelicula/${movie.id}`}
+              className="movie-poster"
+              aria-label={`Ver detalle de ${movie.title}`}
+              style={{position: 'relative'}}
+            >
+              <img src={movie.poster} alt={`Póster de ${movie.title}`} />
+              <div className="movie-hover-overlay" aria-hidden="true">
                 <span>Ver detalle ⟩</span>
               </div>
-            </div>
+            </a>
           ))}
         </div>
       </section>

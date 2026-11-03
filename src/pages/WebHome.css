@@ -284,3 +284,25 @@
     flex-wrap: wrap;
   }
 }
+
+/* a11y APF3: Mejoras accesibles en Inicio */
+.carousel-control:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 4px;
+}
+.dot {
+  border: none;
+  padding: 0;
+}
+.dot:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+}
+a.movie-poster {
+  text-decoration: none;
+  display: block;
+}
+a.movie-poster:focus-visible {
+  outline: 3px solid var(--electric-blue);
+  outline-offset: 3px;
+}
