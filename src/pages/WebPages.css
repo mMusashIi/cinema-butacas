@@ -1518,3 +1518,25 @@ a.cinema-card-visual:focus-visible {
   outline-offset: -2px;
   background: var(--action-red-dim);
 }
+
+/* a11y APF3: Tabs de autenticación con foco visible */
+.auth-tab:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* a11y APF3: Indicador de foco visible de alto contraste en inputs y botones (WCAG 2.4.7 / 2.4.11) */
+.form-group input:focus-visible,
+.payment-form input:focus-visible,
+.payment-form select:focus-visible,
+.input-web:focus-visible {
+  outline: 2px solid var(--electric-blue) !important;
+  outline-offset: 1px;
+}
+.btn-auth:focus-visible,
+.btn-solid:focus-visible,
+.btn-outline:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+}

@@ -9,8 +9,6 @@ export default function WebAuth() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isLogin) {
-      // Si el usuario es administrador, podemos redirigirlo al dashboard
-      // Si es un cliente normal, al home web
       navigate('/dashboard'); 
     } else {
       navigate('/web');
@@ -20,14 +18,20 @@ export default function WebAuth() {
   return (
     <div className="web-page-center">
       <div className="auth-card">
-        <div className="auth-tabs">
+        <div className="auth-tabs" role="tablist" aria-label="Opciones de autenticación">
           <button 
+            type="button"
+            role="tab"
+            aria-selected={isLogin}
             className={`auth-tab ${isLogin ? 'active' : ''}`} 
             onClick={() => setIsLogin(true)}
           >
             Iniciar Sesión
           </button>
           <button 
+            type="button"
+            role="tab"
+            aria-selected={!isLogin}
             className={`auth-tab ${!isLogin ? 'active' : ''}`} 
             onClick={() => setIsLogin(false)}
           >
@@ -35,34 +39,68 @@ export default function WebAuth() {
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form 
+          className="auth-form" 
+          onSubmit={handleSubmit}
+          aria-label={isLogin ? 'Formulario de inicio de sesión' : 'Formulario de registro'}
+        >
           {!isLogin && (
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="auth-firstname">Nombre</label>
-                <input id="auth-firstname" type="text" placeholder="Tu nombre" required />
+                <input 
+                  id="auth-firstname" 
+                  type="text" 
+                  autoComplete="given-name" 
+                  placeholder="Tu nombre" 
+                  required 
+                />
               </div>
               <div className="form-group">
                 <label htmlFor="auth-lastname">Apellido</label>
-                <input id="auth-lastname" type="text" placeholder="Tu apellido" required />
+                <input 
+                  id="auth-lastname" 
+                  type="text" 
+                  autoComplete="family-name" 
+                  placeholder="Tu apellido" 
+                  required 
+                />
               </div>
             </div>
           )}
 
           <div className="form-group">
-            <label htmlFor="auth-email">Correo</label>
-            <input id="auth-email" type="email" placeholder="correo@ejemplo.com" required />
+            <label htmlFor="auth-email">Correo electrónico</label>
+            <input 
+              id="auth-email" 
+              type="email" 
+              autoComplete="email" 
+              placeholder="correo@ejemplo.com" 
+              required 
+            />
           </div>
 
           <div className="form-group">
             <label htmlFor="auth-password">Contraseña</label>
-            <input id="auth-password" type="password" placeholder="••••••••" required />
+            <input 
+              id="auth-password" 
+              type="password" 
+              autoComplete={isLogin ? 'current-password' : 'new-password'} 
+              placeholder="••••••••" 
+              required 
+            />
           </div>
 
           {!isLogin && (
             <div className="form-group">
               <label htmlFor="auth-password-confirm">Confirmar contraseña</label>
-              <input id="auth-password-confirm" type="password" placeholder="••••••••" required />
+              <input 
+                id="auth-password-confirm" 
+                type="password" 
+                autoComplete="new-password" 
+                placeholder="••••••••" 
+                required 
+              />
             </div>
           )}
 
