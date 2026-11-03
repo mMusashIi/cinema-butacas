@@ -1486,3 +1486,16 @@ html[data-vision="mono"] .legend-selected {
   outline: 3px solid var(--electric-blue);
   outline-offset: 2px;
 }
+
+/* a11y APF3: Acordeón de cines en detalle de película */
+.accordion-header-cinema-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+}
+.accordion-header-cinema-btn:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: -2px;
+}

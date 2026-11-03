@@ -20,7 +20,6 @@ export default function WebMovieDetails() {
 
   const cities  = [...new Set(branches.map(b => b.city))];
   const cinemaNames = branches.map(b => b.name);
-
   const dates = ['Hoy Lunes', 'Martes 19', 'Miércoles 20'];
 
   const toggleCinema = (cinemaName) => {
@@ -42,11 +41,14 @@ export default function WebMovieDetails() {
 
   return (
     <div className="movie-details-page">
-      
-      {/* 1. Banner superior con trailer */}
-      <div className="movie-detail-banner" style={{ backgroundImage: `url(${movie.backdrop || movie.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <button className="btn-play-trailer">
-          <span className="play-icon" style={{display: 'flex'}}>
+
+      {/* 1. Banner superior con botón de trailer */}
+      <div
+        className="movie-detail-banner"
+        style={{ backgroundImage: `url(${movie.backdrop || movie.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
+        <button className="btn-play-trailer" aria-label={`Ver tráiler de ${movie.title}`}>
+          <span className="play-icon" style={{display: 'flex'}} aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
             </svg>
@@ -56,8 +58,8 @@ export default function WebMovieDetails() {
       </div>
 
       <div className="movie-detail-content">
-        
-        {/* 2. Cabecera principal con título y botón de comprar */}
+
+        {/* 2. Cabecera principal */}
         <div className="movie-header-section">
           <div className="movie-title-info">
             <h1>{movie.title}</h1>
@@ -66,10 +68,10 @@ export default function WebMovieDetails() {
             </p>
           </div>
           <button className="btn-comprar-top" onClick={handleScrollToShowtimes}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px', verticalAlign: 'text-bottom'}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px', verticalAlign: 'text-bottom'}} aria-hidden="true">
               <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/>
             </svg>
-            Comprar
+            Comprar entradas
           </button>
         </div>
 
@@ -77,16 +79,17 @@ export default function WebMovieDetails() {
         <div className="movie-info-cols">
           <div className="movie-info-left">
             <div className="poster-wrapper">
-              <img src={movie.poster} alt={movie.title} />
-              {movie.featured && <div className="diagonal-tag">Estreno</div>}
+              {/* alt descriptivo — WCAG 1.1.1 */}
+              <img src={movie.poster} alt={`Póster de ${movie.title}`} />
+              {movie.featured && <div className="diagonal-tag" aria-hidden="true">Estreno</div>}
             </div>
           </div>
 
           <div className="movie-info-right">
             <div className="synopsis-card">
-              <h2>Sinopsis.</h2>
+              <h2>Sinopsis</h2>
               <p className="synopsis-text">{movie.synopsis}</p>
-              
+
               <div className="info-meta-group">
                 <h3>Idioma</h3>
                 <div className="lang-tags">
@@ -95,7 +98,7 @@ export default function WebMovieDetails() {
               </div>
 
               <div className="info-meta-group">
-                <h3>Disponible</h3>
+                <h3>Disponible en</h3>
                 <p className="formats-available">{movie.format.join(', ')}</p>
               </div>
             </div>
@@ -108,29 +111,11 @@ export default function WebMovieDetails() {
 
           {/* Filtros de la función */}
           <div className="showtimes-filters-bar">
-            <CustomDropdown
-              label="Por ciudad"
-              placeholder="Dónde estás"
-              options={cities}
-              value={filterCity}
-              onChange={setFilterCity}
-            />
-            <div className="filter-divider-showtime"></div>
-            <CustomDropdown
-              label="Por cine"
-              placeholder="Elige tu Cine"
-              options={cinemaNames}
-              value={filterCinema}
-              onChange={setFilterCinema}
-            />
-            <div className="filter-divider-showtime"></div>
-            <CustomDropdown
-              label="Por fecha"
-              placeholder="Elige un día"
-              options={dates}
-              value={filterDate}
-              onChange={setFilterDate}
-            />
+            <CustomDropdown label="Por ciudad"  placeholder="Dónde estás"    options={cities}      value={filterCity}   onChange={setFilterCity}   />
+            <div className="filter-divider-showtime" aria-hidden="true"></div>
+            <CustomDropdown label="Por cine"    placeholder="Elige tu Cine"  options={cinemaNames} value={filterCinema} onChange={setFilterCinema} />
+            <div className="filter-divider-showtime" aria-hidden="true"></div>
+            <CustomDropdown label="Por fecha"   placeholder="Elige un día"   options={dates}       value={filterDate}   onChange={setFilterDate}   />
           </div>
 
           {/* Acordeón de cines */}
@@ -139,23 +124,28 @@ export default function WebMovieDetails() {
               const isExpanded = expandedCinema === cine.name;
               return (
                 <div key={cine.name} className="accordion-item-cinema">
-                  <div className="accordion-header-cinema" onClick={() => toggleCinema(cine.name)}>
+                  {/* <button> con aria-expanded — WCAG 2.1.1 / 4.1.2 */}
+                  <button
+                    type="button"
+                    className="accordion-header-cinema accordion-header-cinema-btn"
+                    aria-expanded={isExpanded}
+                    onClick={() => toggleCinema(cine.name)}
+                  >
                     <h3>{cine.name}</h3>
-                    <span className="arrow">{isExpanded ? '−' : '+'}</span>
-                  </div>
+                    <span className="arrow" aria-hidden="true">{isExpanded ? '−' : '+'}</span>
+                  </button>
 
                   {isExpanded && (
                     <div className="accordion-body-cinema">
-                      <div className="room-type-tag">
-                        2D REGULAR DOBLADA
-                      </div>
-                      
+                      <div className="room-type-tag">2D REGULAR DOBLADA</div>
+
                       <div className="showtime-buttons-grid">
                         {cine.showtimes.map((st, index) => (
                           <button
                             key={index}
                             className={`showtime-btn ${!st.active ? 'disabled' : ''}`}
                             disabled={!st.active}
+                            aria-label={`Función ${st.active ? 'disponible' : 'no disponible'} a las ${st.time}`}
                             onClick={() => navigate('/web/compra', {
                               state: {
                                 movie,
@@ -168,7 +158,7 @@ export default function WebMovieDetails() {
                           >
                             <span className="time-lbl">{st.time}</span>
                             {st.active && (
-                              <span className="chair-icon" style={{display: 'flex'}}>
+                              <span className="chair-icon" style={{display: 'flex'}} aria-hidden="true">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M4 18v3"/><path d="M20 18v3"/><path d="M5 10V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5"/><path d="M3 10a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h18a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
                                 </svg>
@@ -183,11 +173,8 @@ export default function WebMovieDetails() {
               );
             })}
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }
