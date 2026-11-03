@@ -1422,3 +1422,67 @@ html[data-vision="mono"] .legend-selected {
   .movies-grid-view { grid-template-columns: minmax(0, 1fr); }
   .active-filters-pills { flex-wrap: wrap; }
 }
+
+/* ── a11y APF3: filtros del sidebar como <button> ── */
+.filter-title-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 10px 0;
+  color: var(--text-main);
+  font-family: inherit;
+  transition: color 0.2s;
+}
+.filter-title-btn:hover { color: var(--action-red); }
+.filter-title-btn:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Opciones de filtro como <button> */
+.filter-option-btn {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.filter-option-btn:hover { color: var(--text-main); }
+.filter-option-btn.active-option { color: var(--action-red); font-weight: bold; }
+.filter-option-btn:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Tarjetas de película accesibles */
+.movie-poster-link {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+}
+.movie-poster-link img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.movie-poster-link:focus-visible {
+  outline: 3px solid var(--electric-blue);
+  outline-offset: 2px;
+}
