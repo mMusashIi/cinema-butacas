@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCinema } from '../context/CinemaContext';
 import './WebPages.css';
@@ -23,12 +23,19 @@ export default function WebBooking() {
   const [step, setStep] = useState(1); // 1 = Butacas, 2 = Pago
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const successBtnRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { enabledMovies, branches } = useCinema();
 
-  // Datos reales de la selección del usuario (película, cine, fecha, horario).
-  // Si se llega directo a /web/compra sin pasar por el flujo, se usa un fallback real (no inventado).
+  // Gestión de foco al abrir el modal de compra exitosa (WCAG 2.4.3 / 4.1.2)
+  useEffect(() => {
+    if (showSuccessModal && successBtnRef.current) {
+      successBtnRef.current.focus();
+    }
+  }, [showSuccessModal]);
+
+  // Datos reales de la selección del usuario
   const booking = location.state || {};
   const movie = booking.movie || enabledMovies[0] || null;
   const cinemaName = booking.cinema || branches[0]?.name || 'Cine';
@@ -112,25 +119,38 @@ export default function WebBooking() {
   return (
     <div className="web-booking-layout">
 
+      {/* Modal de confirmación accesible con role="dialog", aria-modal="true" (WCAG 4.1.2 / 2.4.3) */}
       {showSuccessModal && (
-        <div className="booking-success-overlay">
+        <div 
+          className="booking-success-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-success-title"
+          aria-describedby="modal-success-desc"
+        >
           <div className="booking-success-modal">
-            <div className="success-icon-circle">
+            <div className="success-icon-circle" aria-hidden="true">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
               </svg>
             </div>
-            <h2>¡Compra Exitosa!</h2>
-            <p>Tus boletos han sido enviados a tu correo electrónico. Disfruta de la función.</p>
-            <button className="btn-solid" onClick={() => navigate('/WebHome')} style={{ width: '100%' }}>
+            <h2 id="modal-success-title">¡Compra Exitosa!</h2>
+            <p id="modal-success-desc">Tus boletos han sido enviados a tu correo electrónico. Disfruta de la función.</p>
+            <button 
+              ref={successBtnRef}
+              type="button"
+              className="btn-solid" 
+              onClick={() => navigate('/WebHome')} 
+              style={{ width: '100%' }}
+            >
               Volver al Inicio
             </button>
           </div>
         </div>
       )}
 
-      <div className="booking-main">
+      <main className="booking-main">
         <nav className="booking-steps" aria-label="Progreso de la compra">
           {STEPS.map((label, idx) => {
             const n = idx + 1;
@@ -150,12 +170,12 @@ export default function WebBooking() {
         {step === 1 ? (
           <div className="seats-selection">
             <div className="screen-indicator">
-              <div className="screen-bar" />
+              <div className="screen-bar" aria-hidden="true" />
               <p className="screen-label">Pantalla</p>
             </div>
 
             <div className="seats-map-scroll">
-              <div className="seats-map">
+              <div className="seats-map" role="group" aria-label="Mapa de sala y butacas">
                 {Array.from({ length: ROWS }).map((_, r) =>
                   Array.from({ length: COLS }).map((_, c) => {
                     const rowLetter = String.fromCharCode(65 + r);
@@ -185,15 +205,21 @@ export default function WebBooking() {
               </div>
             </div>
 
-            <ul className="seats-legend">
+            <ul className="seats-legend" aria-label="Leyenda del mapa de butacas">
               <li><span className="legend-swatch legend-available" aria-hidden="true"></span>Disponible</li>
               <li><span className="legend-swatch legend-selected" aria-hidden="true">✓</span>Seleccionada</li>
               <li><span className="legend-swatch legend-occupied" aria-hidden="true">✕</span>Ocupada</li>
             </ul>
 
             <div className="booking-actions booking-actions-center">
-              <button className="btn-solid" disabled={selectedSeats.length === 0} onClick={() => setStep(2)}>
-                Continuar ⟩
+              <button 
+                type="button"
+                className="btn-solid" 
+                disabled={selectedSeats.length === 0} 
+                onClick={() => setStep(2)}
+                aria-label="Continuar al paso de pago"
+              >
+                Continuar al pago ⟩
               </button>
             </div>
           </div>
@@ -213,6 +239,7 @@ export default function WebBooking() {
                 <input
                   id="pay-name"
                   type="text"
+                  autoComplete="cc-name"
                   className="input-web"
                   placeholder="Como aparece en la tarjeta"
                   value={cardName}
@@ -284,16 +311,28 @@ export default function WebBooking() {
             </form>
 
             <div className="booking-actions booking-actions-split">
-              <button className="btn-outline" onClick={() => setStep(1)}>⟨ Volver</button>
-              <button className="btn-solid" disabled={!isPaymentValid} onClick={handlePayment}>
+              <button 
+                type="button" 
+                className="btn-outline" 
+                onClick={() => setStep(1)}
+                aria-label="Volver a la selección de butacas"
+              >
+                ⟨ Volver a butacas
+              </button>
+              <button 
+                type="button"
+                className="btn-solid" 
+                disabled={!isPaymentValid} 
+                onClick={handlePayment}
+              >
                 Pagar S/ {total.toFixed(2)} ⟩
               </button>
             </div>
           </div>
         )}
-      </div>
+      </main>
 
-      <aside className="booking-sidebar">
+      <aside className="booking-sidebar" aria-label="Resumen de la compra">
         <div className="movie-summary-card">
           <div className="movie-img-placeholder">
             {movie?.poster
@@ -311,20 +350,20 @@ export default function WebBooking() {
         <p className="highlight-text">{cinemaName}</p>
         <p className="summary-meta">{showDate} - {showTime}</p>
 
-        <div className="divider"></div>
+        <div className="divider" aria-hidden="true"></div>
 
         <h3 className="summary-subtitle">Resumen de Compra</h3>
 
         <div className="seats-selected-list">
           <p className="summary-label">Butacas Seleccionadas:</p>
-          <div className="selected-seats-chips">
+          <div className="selected-seats-chips" aria-live="polite">
             {selectedSeats.length > 0
               ? selectedSeats.map(s => <span key={s} className="seat-chip">{s}</span>)
               : <span className="no-seats-text">Ninguna seleccionada</span>}
           </div>
         </div>
 
-        <div className="divider"></div>
+        <div className="divider" aria-hidden="true"></div>
 
         {selectedSeats.length > 0 && (
           <p className="price-breakdown">
@@ -332,7 +371,7 @@ export default function WebBooking() {
           </p>
         )}
 
-        <div className="total-row">
+        <div className="total-row" aria-live="polite">
           <p className="total-label">Total a Pagar:</p>
           <p className="price">S/ {total.toFixed(2)}</p>
         </div>
