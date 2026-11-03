@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useCinema } from '../context/CinemaContext';
 import CustomDropdown from '../components/CustomDropdown';
 import './WebPages.css';
 
 export default function WebCinemas() {
-  const navigate = useNavigate();
   const { branches } = useCinema();
   const [selectedCity, setSelectedCity] = useState('Todas las ciudades');
   const [selectedFormat, setSelectedFormat] = useState('Todos los formatos');
@@ -27,7 +25,7 @@ export default function WebCinemas() {
         <h1 className="cinemas-title">Cines</h1>
       </div>
 
-      <div className="cinemas-filter-bar">
+      <div className="cinemas-filter-bar" aria-label="Filtros de cines">
         <CustomDropdown
           label="Por Ciudad"
           placeholder="Todas las ciudades"
@@ -36,7 +34,7 @@ export default function WebCinemas() {
           onChange={val => setSelectedCity(val || 'Todas las ciudades')}
         />
         
-        <div className="filter-divider"></div>
+        <div className="filter-divider" aria-hidden="true"></div>
         
         <CustomDropdown
           label="Por Formato"
@@ -47,17 +45,18 @@ export default function WebCinemas() {
         />
       </div>
 
-      <div className="cinemas-grid-view">
+      <main className="cinemas-grid-view" aria-label="Listado de cines">
         {filteredBranches.length > 0 ? (
           filteredBranches.map(cine => (
-            <div 
+            <a 
               key={cine.id} 
+              href={`/web/cine/${cine.id}`}
               className="cinema-card-visual" 
-              onClick={() => navigate(`/web/cine/${cine.id}`)}
+              aria-label={`Ver cartelera de ${cine.name}, ubicado en ${cine.address}`}
             >
               <div className="cinema-card-img">
-                <img src={cine.img} alt={cine.name} />
-                <div className="cinema-hover-overlay">
+                <img src={cine.img} alt={`Fotografía del cine ${cine.name}`} />
+                <div className="cinema-hover-overlay" aria-hidden="true">
                   <span>Ver Cartelera ⟩</span>
                 </div>
               </div>
@@ -66,14 +65,14 @@ export default function WebCinemas() {
                 <p className="cinema-address">{cine.address}</p>
                 <p className="cinema-formats">{Array.isArray(cine.formats) ? cine.formats.join(', ') : (cine.formats || '2D, REGULAR')}</p>
               </div>
-            </div>
+            </a>
           ))
         ) : (
-          <div className="no-cinemas-message" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <div className="no-cinemas-message" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }} role="status">
             No se encontraron cines que coincidan con los filtros seleccionados.
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

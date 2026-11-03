@@ -1499,3 +1499,15 @@ html[data-vision="mono"] .legend-selected {
   outline: 2px solid var(--electric-blue);
   outline-offset: -2px;
 }
+
+/* a11y APF3: Tarjetas de cine accesibles */
+a.cinema-card-visual {
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+a.cinema-card-visual:focus-visible {
+  outline: 3px solid var(--electric-blue);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
