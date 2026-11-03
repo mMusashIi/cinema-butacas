@@ -1511,3 +1511,10 @@ a.cinema-card-visual:focus-visible {
   outline-offset: 4px;
   border-radius: 8px;
 }
+
+/* a11y APF3: Items de CustomDropdown accesibles con teclado */
+.custom-dd-item:focus-visible {
+  outline: 2px solid var(--electric-blue);
+  outline-offset: -2px;
+  background: var(--action-red-dim);
+}
