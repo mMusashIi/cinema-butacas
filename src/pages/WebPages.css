@@ -28,7 +28,7 @@
   flex: 1;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 1.2rem;
   padding-bottom: 1rem;
   cursor: pointer;
@@ -277,7 +277,7 @@
   margin: 0;
   font-size: 0.9rem;
   font-weight: bold;
-  color: var(--action-red);
+  color: var(--cinema-gold);
 }
 
 /* === Web Movies (Layout con Sidebar) === */
@@ -344,7 +344,7 @@
   cursor: pointer;
 }
 .filter-options p:hover { color: var(--text-main); }
-.filter-options .active-option { color: var(--action-red); font-weight: bold; }
+.filter-options .active-option { color: var(--cinema-gold); font-weight: bold; }
 
 /* Lista de Películas */
 .movies-list {
@@ -365,8 +365,7 @@
   gap: 10px;
 }
 .active-filters-pills .pill {
-  border: 1px solid var(--action-red);
-  color: var(--action-red);
+  border: 1px solid var(--cinema-gold); color: var(--cinema-gold); background: rgba(245, 197, 24, 0.12);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.85rem;
@@ -511,21 +510,21 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-muted);
+  color: #D1D5DB;
   font-size: 0.95rem;
   font-weight: 600;
 }
 .booking-step .step-num {
   width: 26px; height: 26px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--border);
+  border: 2px solid #9CA3AF; color: #E5E7EB;
   font-size: 0.8rem;
   flex-shrink: 0;
 }
 .booking-step.current { color: var(--text-main); }
 .booking-step.current .step-num { background: var(--accent-solid); border-color: var(--action-red); color: #fff; }
 .booking-step.done .step-num { background: var(--accent-solid-success); border-color: var(--emerald); color: #fff; }
-.step-arrow { color: var(--text-muted); }
+.step-arrow { color: #9CA3AF; }
 
 /* width:100% evita que .booking-main (align-items:center) encoja este
    contenedor a su max-content — sin esto, el mapa de butacas con overflow-x
@@ -593,10 +592,11 @@
 .seat-btn:hover:not(:disabled) { border-color: var(--action-red); color: var(--text-primary); }
 .seat-btn:focus-visible { outline: 2px solid var(--electric-blue); outline-offset: 2px; }
 
-.seat-btn.seat-selected {
+.seat-btn.seat-selected,
+.seat-btn.seat-selected:hover {
   background: var(--accent-solid);
   border-color: var(--action-red);
-  color: #fff;
+  color: #ffffff !important;
 }
 .seat-btn.seat-occupied {
   background-image: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px);
@@ -1423,7 +1423,24 @@ html[data-vision="mono"] .legend-selected {
   .active-filters-pills { flex-wrap: wrap; }
 }
 
-/* ── a11y APF3: filtros del sidebar como <button> ── */
+/* ==========================================================
+   MEJORAS DE ACCESIBILIDAD (APF3 - WCAG 2.1 AA)
+   ========================================================== */
+
+/* Utilidad para regiones vivas invisibles (WCAG 4.1.3) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Botones accesibles de acordeones y opciones (WebMovies) */
 .filter-title-btn {
   width: 100%;
   background: none;
@@ -1432,111 +1449,99 @@ html[data-vision="mono"] .legend-selected {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  font-family: inherit;
   font-size: 1rem;
   font-weight: bold;
-  padding: 10px 0;
   color: var(--text-main);
-  font-family: inherit;
+  padding: 10px 0;
   transition: color 0.2s;
 }
-.filter-title-btn:hover { color: var(--action-red); }
+.filter-title-btn:hover {
+  color: var(--action-red);
+}
 .filter-title-btn:focus-visible {
   outline: 2px solid var(--electric-blue);
   outline-offset: 2px;
-  border-radius: 4px;
 }
-
-/* Opciones de filtro como <button> */
 .filter-option-btn {
-  background: none;
-  border: none;
   width: 100%;
   text-align: left;
-  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
   font-size: 0.9rem;
   color: var(--text-secondary);
   cursor: pointer;
-  font-family: inherit;
-  transition: color 0.15s;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
-.filter-option-btn:hover { color: var(--text-main); }
-.filter-option-btn.active-option { color: var(--action-red); font-weight: bold; }
+.filter-option-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+.filter-option-btn.active-option {
+  color: var(--cinema-gold);
+  font-weight: bold;
+  background: rgba(245, 197, 24, 0.12);
+}
 .filter-option-btn:focus-visible {
   outline: 2px solid var(--electric-blue);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-/* Tarjetas de película accesibles */
-.movie-poster-link {
-  display: block;
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  text-decoration: none;
-}
-.movie-poster-link img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.movie-poster-link:focus-visible {
-  outline: 3px solid var(--electric-blue);
-  outline-offset: 2px;
-}
-
-/* a11y APF3: Acordeón de cines en detalle de película */
-.accordion-header-cinema-btn {
-  width: 100%;
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  text-align: left;
-}
-.accordion-header-cinema-btn:focus-visible {
-  outline: 2px solid var(--electric-blue);
-  outline-offset: -2px;
-}
-
-/* a11y APF3: Tarjetas de cine accesibles */
-a.cinema-card-visual {
-  text-decoration: none;
-  display: block;
-  color: inherit;
-}
-a.cinema-card-visual:focus-visible {
-  outline: 3px solid var(--electric-blue);
-  outline-offset: 4px;
-  border-radius: 8px;
-}
-
-/* a11y APF3: Items de CustomDropdown accesibles con teclado */
-.custom-dd-item:focus-visible {
-  outline: 2px solid var(--electric-blue);
-  outline-offset: -2px;
-  background: var(--action-red-dim);
-}
-
-/* a11y APF3: Tabs de autenticación con foco visible */
-.auth-tab:focus-visible {
-  outline: 2px solid var(--electric-blue);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* a11y APF3: Indicador de foco visible de alto contraste en inputs y botones (WCAG 2.4.7 / 2.4.11) */
-.form-group input:focus-visible,
-.payment-form input:focus-visible,
-.payment-form select:focus-visible,
-.input-web:focus-visible {
-  outline: 2px solid var(--electric-blue) !important;
   outline-offset: 1px;
 }
-.btn-auth:focus-visible,
-.btn-solid:focus-visible,
-.btn-outline:focus-visible {
+
+/* Boton de ayuda CVV accesible (WCAG 2.5.5 / 2.5.8) */
+.btn-help-cvv {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  position: relative;
+  font-family: inherit;
+  margin-left: 6px;
+}
+.btn-help-cvv::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.btn-help-cvv:focus-visible {
   outline: 2px solid var(--electric-blue);
   outline-offset: 2px;
+}
+
+/* Area de contacto tactil de 44px para butacas (WCAG 2.5.5) */
+.seat-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Indicador global de foco visible (WCAG 2.4.7) */
+.web-container a:focus-visible,
+.web-container button:focus-visible,
+.web-container input:focus-visible,
+.web-container select:focus-visible {
+  outline: 2px solid var(--electric-blue) !important;
+  outline-offset: 2px !important;
 }

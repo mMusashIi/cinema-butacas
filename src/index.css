@@ -736,3 +736,24 @@ h3, h4, .subheading { font-family: 'Poppins', 'Montserrat', sans-serif; font-wei
 /* Glow utility */
 .glow-red  { box-shadow: 0 0 24px var(--action-red-glow); }
 .glow-gold { box-shadow: 0 0 24px var(--cinema-gold-glow); }
+
+/* Mejoras de contraste en botones para modos de daltonismo (WCAG 1.4.3) */
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-solid,
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-auth,
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-buscar,
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-catalogo,
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-comprar,
+html[data-theme="dark"][data-vision="protan-deutan"] .btn-comprar-top {
+  color: #0A1C2A !important;
+  font-weight: 800;
+}
+
+html[data-theme="dark"][data-vision="tritan"] .btn-solid,
+html[data-theme="dark"][data-vision="tritan"] .btn-auth,
+html[data-theme="dark"][data-vision="tritan"] .btn-buscar,
+html[data-theme="dark"][data-vision="tritan"] .btn-catalogo,
+html[data-theme="dark"][data-vision="tritan"] .btn-comprar,
+html[data-theme="dark"][data-vision="tritan"] .btn-comprar-top {
+  color: #1A000E !important;
+  font-weight: 800;
+}
