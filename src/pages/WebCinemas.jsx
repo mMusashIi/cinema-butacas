@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCinema } from '../context/CinemaContext';
 import CustomDropdown from '../components/CustomDropdown';
+import { usePageTitle } from '../hooks/usePageTitle';
 import './WebPages.css';
 
 export default function WebCinemas() {
+  const navigate = useNavigate();
+  usePageTitle('Cines');
   const { branches } = useCinema();
   const [selectedCity, setSelectedCity] = useState('Todas las ciudades');
   const [selectedFormat, setSelectedFormat] = useState('Todos los formatos');
@@ -45,19 +49,19 @@ export default function WebCinemas() {
         />
       </div>
 
-      <main className="cinemas-grid-view" aria-label="Listado de cines">
+      <section className="cinemas-grid-view" aria-label="Lista de cines disponibles">
         {filteredBranches.length > 0 ? (
           filteredBranches.map(cine => (
             <a 
               key={cine.id} 
               href={`/web/cine/${cine.id}`}
               className="cinema-card-visual" 
-              aria-label={`Ver cartelera de ${cine.name}, ubicado en ${cine.address}`}
+              onClick={(e) => { e.preventDefault(); navigate(`/web/cine/${cine.id}`); }}
             >
               <div className="cinema-card-img">
-                <img src={cine.img} alt={`Fotografía del cine ${cine.name}`} />
+                <img src={cine.img} alt={`Fachada de ${cine.name}`} />
                 <div className="cinema-hover-overlay" aria-hidden="true">
-                  <span>Ver Cartelera ⟩</span>
+                  <span>Ver Cartelera &#x27E9;</span>
                 </div>
               </div>
               <div className="cinema-card-details">
@@ -68,11 +72,11 @@ export default function WebCinemas() {
             </a>
           ))
         ) : (
-          <div className="no-cinemas-message" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }} role="status">
+          <div className="no-cinemas-message" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
             No se encontraron cines que coincidan con los filtros seleccionados.
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
